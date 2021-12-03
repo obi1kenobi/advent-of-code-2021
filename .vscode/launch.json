@@ -1,0 +1,36 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "program": "/home/predrag/.scratch/.rustc-target/advent-of-code-2021/day3/target/debug/day3",
+            "cwd": "${workspaceFolder}/day3/",
+            "name": "Debug pt1",
+            "preRunCommands": [
+                "target create /home/predrag/.scratch/.rustc-target/advent-of-code-2021/day3/target/debug/day3"
+            ],
+            "args": [
+                "1",
+                "example.txt",
+            ]
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "program": "/home/predrag/.scratch/.rustc-target/advent-of-code-2021/day3/target/debug/day3",
+            "cwd": "${workspaceFolder}/day3/",
+            "name": "Debug pt2",
+            "preRunCommands": [
+                "target create /home/predrag/.scratch/.rustc-target/advent-of-code-2021/day3/target/debug/day3"
+            ],
+            "args": [
+                "2",
+                "example.txt",
+            ]
+        }
+    ]
+}
