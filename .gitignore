@@ -11,3 +11,6 @@ Cargo.lock
 
 # Local configuration
 **/.cargo
+
+# Session key
+**/.session
