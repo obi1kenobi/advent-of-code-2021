@@ -1,5 +1,6 @@
 use std::{env, fs, sync::Arc, io::Write};
 
+use html_escape::decode_html_entities;
 use lazy_static::lazy_static;
 use reqwest::{Url, cookie::Jar};
 use scraper::{Html, Selector};
@@ -63,8 +64,11 @@ fn main() {
             let selector = Selector::parse("pre > code").unwrap();
 
             let element = doc.select(&selector).nth(code_box_index).unwrap();
-            let mut output = fs::File::create(output_location).unwrap();
-            output.write_all(element.inner_html().as_bytes()).unwrap();
+            let element_html = element.inner_html();
+            let escaped = decode_html_entities(element_html.as_str());
+
+            let mut output_file = fs::File::create(output_location).unwrap();
+            output_file.write_all(escaped.as_bytes()).unwrap();
         }
         _ => unreachable!("{}", command),
     }
