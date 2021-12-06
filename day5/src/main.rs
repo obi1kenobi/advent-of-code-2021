@@ -1,11 +1,13 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
-    env, fs, fmt::Display,
+    env,
+    fmt::Display,
+    fs, cmp::{min, max},
 };
 
+use itertools::chain;
 #[allow(unused_imports)]
 use itertools::Itertools;
-use itertools::chain;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct Point {
@@ -46,11 +48,20 @@ impl Display for Line {
 
 impl Line {
     fn new(a: Point, b: Point) -> Self {
-        if a <= b {
+        let result = if a <= b {
             Self { start: a, end: b }
         } else {
             Self { start: b, end: a }
-        }
+        };
+
+        assert!(
+            result.is_x_aligned()
+                || result.is_y_aligned()
+                || result.is_main_diagonal()
+                || result.is_inv_diagonal()
+        );
+
+        result
     }
 
     fn is_x_aligned(&self) -> bool {
@@ -59,6 +70,18 @@ impl Line {
 
     fn is_y_aligned(&self) -> bool {
         self.start.x == self.end.x
+    }
+
+    fn is_main_diagonal(&self) -> bool {
+        let delta_x = self.end.x - self.start.x;
+        let delta_y = self.end.y.saturating_sub(self.start.y);
+        delta_x == delta_y
+    }
+
+    fn is_inv_diagonal(&self) -> bool {
+        let delta_x = self.end.x - self.start.x;
+        let delta_y = self.start.y.saturating_sub(self.end.y);
+        delta_x == delta_y
     }
 }
 
@@ -185,10 +208,11 @@ fn solve_part1(data: &[Line]) -> usize {
             let delta_x = (x_coord - last_x - 1) as usize;
 
             // X-parallel lines that have been overlapping for the entire swept segment.
-            overlaps += delta_x * active_points
-                .iter()
-                .filter(|(_, value)| **value > 1)
-                .count();
+            overlaps += delta_x
+                * active_points
+                    .iter()
+                    .filter(|(_, value)| **value > 1)
+                    .count();
         };
         last_x_coord = Some(x_coord);
 
@@ -207,7 +231,8 @@ fn solve_part1(data: &[Line]) -> usize {
         }
 
         let mut active_points_iter = active_points.iter().peekable();
-        let mut y_line_points_iter = points.iter()
+        let mut y_line_points_iter = points
+            .iter()
             .filter(|(_, _, index)| {
                 let line = axis_aligned_lines[*index];
 
@@ -235,7 +260,9 @@ fn solve_part1(data: &[Line]) -> usize {
 
             let y_points_of_interest: BTreeSet<u64> = chain!(
                 y_line_points_iter.clone().map(|(pt, _, _)| pt.y),
-                active_points_iter.clone().map(|(y_coord, _)| *y_coord)).collect();
+                active_points_iter.clone().map(|(y_coord, _)| *y_coord)
+            )
+            .collect();
 
             let mut overlapping_ranges = 0usize;
             for y_coord in y_points_of_interest {
@@ -337,49 +364,88 @@ fn solve_part1(data: &[Line]) -> usize {
     overlaps
 }
 
-fn brute_force_part1(data: &[Line]) -> usize {
-    let axis_aligned_lines: Vec<_> = data
+fn brute_force(data: &[Line], ignore_diagonals: bool) -> usize {
+    let all_lines: Vec<_> = if ignore_diagonals {
+        data.iter()
+            .filter(|line| line.is_x_aligned() || line.is_y_aligned())
+            .collect()
+    } else {
+        data.iter().collect()
+    };
+
+    let min_x = all_lines
         .iter()
-        .filter(|line| line.is_x_aligned() || line.is_y_aligned())
-        .collect();
+        .flat_map(|line| [line.start.x, line.end.x])
+        .min()
+        .unwrap();
+    let max_x = all_lines
+        .iter()
+        .flat_map(|line| [line.start.x, line.end.x])
+        .max()
+        .unwrap();
 
-    let min_x = axis_aligned_lines.iter().flat_map(|line| {
-        [
-            line.start.x,
-            line.end.x,
-        ]
-    }).min().unwrap();
-    let max_x = axis_aligned_lines.iter().flat_map(|line| {
-        [
-            line.start.x,
-            line.end.x,
-        ]
-    }).max().unwrap();
-
-    let min_y = axis_aligned_lines.iter().flat_map(|line| {
-        [
-            line.start.y,
-            line.end.y,
-        ]
-    }).min().unwrap();
-    let max_y = axis_aligned_lines.iter().flat_map(|line| {
-        [
-            line.start.y,
-            line.end.y,
-        ]
-    }).max().unwrap();
+    let min_y = all_lines
+        .iter()
+        .flat_map(|line| [line.start.y, line.end.y])
+        .min()
+        .unwrap();
+    let max_y = all_lines
+        .iter()
+        .flat_map(|line| [line.start.y, line.end.y])
+        .max()
+        .unwrap();
 
     let mut count = 0usize;
     for x in min_x..=max_x {
         for y in min_y..=max_y {
-            let second_intersection = axis_aligned_lines.iter().filter(|line| {
-                (line.is_y_aligned() && line.start.x == x && (
-                    line.start.y <= y && y <= line.end.y
-                )) ||
-                (line.is_x_aligned() && line.start.y == y && (
-                    line.start.x <= x && x <= line.end.x
-                ))
-            }).nth(1);
+            let second_intersection = all_lines
+                .iter()
+                .filter(|line| {
+                    let is_on_y_line = line.is_y_aligned()
+                        && line.start.x == x
+                        && line.start.y <= y
+                        && y <= line.end.y;
+                    if is_on_y_line {
+                        return true;
+                    }
+
+                    let is_on_x_line = line.is_x_aligned()
+                        && line.start.y == y
+                        && line.start.x <= x
+                        && x <= line.end.x;
+                    if is_on_x_line {
+                        return true;
+                    }
+
+                    // Check diagonals: first, check that the point is in the bounding box.
+                    let main_diagonal = line.is_main_diagonal();
+                    let inv_diagonal = line.is_inv_diagonal();
+                    if (main_diagonal || inv_diagonal)
+                        && line.start.x <= x
+                        && x <= line.end.x
+                        && min(line.start.y, line.end.y) <= y
+                        && y <= max(line.start.y, line.end.y)
+                    {
+                        if main_diagonal {
+                            let delta = x - line.start.x;
+                            let predicted_y = line.start.y + delta;
+                            predicted_y == y
+                        } else if inv_diagonal {
+                            let delta = x - line.start.x;
+                            if delta > line.start.y {
+                                false
+                            } else {
+                                let predicted_y = line.start.y - delta;
+                                predicted_y == y
+                            }
+                        } else {
+                            unreachable!()
+                        }
+                    } else {
+                        false
+                    }
+                })
+                .nth(1);
             if second_intersection.is_some() {
                 count += 1;
             }
@@ -389,6 +455,14 @@ fn brute_force_part1(data: &[Line]) -> usize {
     count
 }
 
+fn brute_force_part1(data: &[Line]) -> usize {
+    brute_force(data, true)
+}
+
+fn brute_force_part2(data: &[Line]) -> usize {
+    brute_force(data, false)
+}
+
 fn solve_part2(data: &[Line]) -> usize {
-    todo!()
+    brute_force_part2(data)
 }
