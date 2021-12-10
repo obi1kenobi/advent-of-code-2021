@@ -34,10 +34,12 @@ fn main() {
     }
 }
 
+#[allow(unused_variables)]
 fn solve_part1(data: &[u64]) -> usize {
     todo!()
 }
 
+#[allow(unused_variables)]
 fn solve_part2(data: &[u64]) -> usize {
     todo!()
 }
