@@ -55,6 +55,7 @@ fn matching_closing_char(c: char) -> char {
 //  remaining stack if any,
 //  (remaining stack, first illegal char, expected char or None for any open chunk char)
 // >
+#[allow(clippy::type_complexity)]
 fn check_content(content: &str) -> Result<Option<Vec<char>>, (Vec<char>, char, Option<char>)> {
     let mut stack: Vec<char> = vec![];
     for c in content.chars() {
