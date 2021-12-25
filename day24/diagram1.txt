@@ -1,0 +1,41 @@
+// format:
+//
+// add x z  -----> instruction
+// [Input(1), Unknown(0), Unknown(0), Unknown(0)]
+// [(1, 9),   (4, 12),    (4, 12),    (4, 12)]  ^
+//  ^         ^           ^           ^         |
+//  \         \          /            /         |
+//   ---------------------------------          |
+//       range of possible values              /
+//          for each register                 /
+//                                          |_
+//       the values present in each register
+
+// Naive mod range analysis: (0, mod - 1)
+// so Unknown(1) has range (0, 25).
+add x z
+[Input(1), Unknown(0), Unknown(0), Unknown(0)]
+[(1, 9),   (4, 12),    (4, 12),    (4, 12)]
+mod x 26
+[Input(1), Unknown(1), Unknown(0), Unknown(0)]
+[(1, 9),   (0, 25),    (4, 12),    (4, 12)]
+
+// Better analysis: the operation is Unknown(0) mod 25.
+// Unknown(0) has range (4, 12), which is inside (0, mod - 1)
+// so Unknown(1) has range(4, 12).
+add x z
+[Input(1), Unknown(0), Unknown(0), Unknown(0)]
+[(1, 9),   (4, 12),    (4, 12),    (4, 12)]
+mod x 26
+[Input(1), Unknown(1), Unknown(0), Unknown(0)]
+[(1, 9),   (4, 12),    (4, 12),    (4, 12)]
+
+// Best analysis: the input's range (4, 12) is inside (0, mod - 1)
+// so the mod is a no-op and Unknown(1) = Unknown(0).
+// Replace Unknown(1) with Unknown(0) everywhere.
+add x z
+[Input(1), Unknown(0), Unknown(0), Unknown(0)]
+[(1, 9),   (4, 12),    (4, 12),    (4, 12)]
+mod x 26
+[Input(1), Unknown(0), Unknown(0), Unknown(0)]
+[(1, 9),   (4, 12),    (4, 12),    (4, 12)]
