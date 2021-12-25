@@ -1,8 +1,7 @@
 #![feature(map_try_insert)]
-#![feature(saturating_div)]
 
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{btree_map::Entry, BTreeMap, BTreeSet},
     env, fs,
 };
 
@@ -11,6 +10,7 @@ use itertools::Itertools;
 use itertools::{max, min};
 use parser::{parse_program, Instruction, Operand, Register};
 
+#[allow(unused_imports)]
 use crate::parser::InstructionStream;
 
 mod parser;
@@ -498,9 +498,13 @@ fn get_binary_instr_ranges(instr: &Instruction) -> ((i64, i64), (i64, i64)) {
         Instruction::Input(_) => unreachable!(),
         Instruction::Add(_, _)
         | Instruction::Mul(_, _)
-        | Instruction::Div(_, _)
+        | Instruction::Div(_, _)  // We can't exclude zero since range "holes" are non-representable
         | Instruction::Equal(_, _) => (MAX_VALUE_RANGE, MAX_VALUE_RANGE),
-        Instruction::Mod(_, _) => ((0, MAX_VALUE_RANGE.1), (1, MAX_VALUE_RANGE.1)),
+        Instruction::Mod(_, _) => {
+            // The source register's value must be >= 0, or else it's UB.
+            // If the operand is a register, we know it must be > 0 or else it's UB.
+            ((0, MAX_VALUE_RANGE.1), (1, MAX_VALUE_RANGE.1))
+        }
     }
 }
 
@@ -517,46 +521,67 @@ fn intersect_value_ranges(a: (i64, i64), b: (i64, i64)) -> Option<(i64, i64)> {
 
 fn div_range_analysis(source: (i64, i64), divisor: (i64, i64)) -> (i64, i64) {
     let (source_low, source_high) = source;
-    let (divisor_low, divisor_high) = divisor;
+    let (mut divisor_low, mut divisor_high) = divisor;
 
-    // if the range is exactly 0, this is going to blow up
-    assert!(divisor_low != 0 || divisor_high != 0);
+    // If the divisor range is exactly 0, something has gone horribly wrong.
+    assert!(divisor != (0, 0));
+
+    // Otherwise, if either divisor range endpoint is on 0, we can nudge the range to exclude 0
+    // since we know 0 isn't a legal divisor value.
+    if divisor_low == 0 {
+        divisor_low += 1;
+    }
+    if divisor_high == 0 {
+        divisor_high -= 1;
+    }
 
     let (result_low, result_high) = if divisor_low < 0 && divisor_high > 0 {
         // straddling 0, both -1 and 1 are possible
         let extreme_values = [-source_low, source_low, -source_high, source_high];
         (min(extreme_values).unwrap(), max(extreme_values).unwrap())
-    } else if divisor_high <= 0 {
-        // avoid zero values in the divisor range
-        let divisor_high = std::cmp::min(-1, divisor_high);
-
-        // negative divisor range (zero isn't allowed)
+    } else if divisor_high < 0 {
+        // negative divisor range
         if source_low <= 0 && source_high >= 0 {
             // any divided by negative
-            (source_high.saturating_div(divisor_high), source_low.saturating_div(divisor_high))
+            (
+                source_high.saturating_div(divisor_high),
+                source_low.saturating_div(divisor_high),
+            )
         } else if source_high < 0 {
             // both operands are negative, so the result is positive
-            (source_high.saturating_div(divisor_low), source_low.saturating_div(divisor_high))
+            (
+                source_high.saturating_div(divisor_low),
+                source_low.saturating_div(divisor_high),
+            )
         } else if source_low > 0 {
             // positive divided by negative, the result is negative
-            (source_high.saturating_div(divisor_high), source_low.saturating_div(divisor_low))
+            (
+                source_high.saturating_div(divisor_high),
+                source_low.saturating_div(divisor_low),
+            )
         } else {
             unreachable!()
         }
-    } else if divisor_low >= 0 {
-        // avoid zero values in the divisor range
-        let divisor_low = std::cmp::max(1, divisor_low);
-
-        // positive divisor range (zero isn't allowed)
+    } else if divisor_low > 0 {
+        // positive divisor range
         if source_low <= 0 && source_high >= 0 {
             // any divided by positive
-            (source_low.saturating_div(divisor_low), source_high.saturating_div(divisor_low))
+            (
+                source_low.saturating_div(divisor_low),
+                source_high.saturating_div(divisor_low),
+            )
         } else if source_high < 0 {
             // negative divided by positive, the result is negative
-            (source_low.saturating_div(divisor_low), source_high.saturating_div(divisor_high))
+            (
+                source_low.saturating_div(divisor_low),
+                source_high.saturating_div(divisor_high),
+            )
         } else if source_low > 0 {
             // both operands are positive, the result is positive
-            (source_low.saturating_div(divisor_high), source_high.saturating_div(divisor_low))
+            (
+                source_low.saturating_div(divisor_high),
+                source_high.saturating_div(divisor_low),
+            )
         } else {
             unreachable!()
         }
@@ -721,6 +746,72 @@ fn mod_range_analysis(source: (i64, i64), operand: (i64, i64)) -> (i64, i64) {
     (result_low, result_high)
 }
 
+fn inv_div_range_analysis(result: (i64, i64), mut divisor: (i64, i64)) -> (i64, i64) {
+    // source / divisor = result, solve for source given ranges for result and divisor
+    let (result_low, result_high) = result;
+    let (mut divisor_low, mut divisor_high) = divisor;
+
+    // Ensure valid values are available in the range.
+    assert!(result_high >= result_low);
+    assert!(divisor_high >= divisor_low);
+
+    // If the divisor range is exactly 0, something has gone horribly wrong.
+    assert!(divisor != (0, 0));
+
+    // Otherwise, if either divisor range endpoint is on 0, we can nudge the range to exclude 0
+    // since we know 0 isn't a legal divisor value.
+    if divisor_low == 0 {
+        divisor_low += 1;
+        divisor = (divisor_low, divisor_high);
+    }
+    if divisor_high == 0 {
+        divisor_high -= 1;
+        divisor = (divisor_low, divisor_high);
+    }
+
+    let (source_low, source_high) = {
+        // Calculate the truncated value range to be added to the multipled source value.
+        let (truncated_low, truncated_high) = if (divisor_low >= 0 && result_low >= 0)
+            || (divisor_high <= 0 && result_high <= 0)
+        {
+            // The result and divisor ranges both lie fully on the same side of 0.
+            (0, std::cmp::max(0, divisor_high - 1))
+        } else if (divisor_high <= 0 && result_low >= 0) || (divisor_low >= 0 && result_high <= 0) {
+            // The result and divisor ranges lie fully on opposite sides of 0.
+            (std::cmp::min(divisor_low + 1, 0), 0)
+        } else {
+            // At least one of the ranges lies on both sides of 0,
+            // so the truncation could happen on either side of 0.
+            (divisor_low + 1, divisor_high - 1)
+        };
+
+        let (source_low, source_high) = mul_range_analysis(result, divisor);
+
+        println!(
+            "{:?} {:?} --> {:?} {:?}",
+            result,
+            divisor,
+            (source_low, source_high),
+            (truncated_low, truncated_high)
+        );
+
+        (
+            source_low.saturating_add(truncated_low),
+            source_high.saturating_add(truncated_high),
+        )
+    };
+
+    assert!(
+        source_low <= source_high,
+        "{:?} {:?} -> ({}, {})",
+        result,
+        divisor,
+        source_low,
+        source_high
+    );
+    (source_low, source_high)
+}
+
 fn value_range_analysis(
     value_definitions: &BTreeMap<usize, ([RegisterState; 4], &Instruction)>,
 ) -> BTreeMap<usize, (i64, i64)> {
@@ -778,6 +869,285 @@ fn value_range_analysis(
     result
 }
 
+fn update_range_data(
+    input_ranges: &mut BTreeMap<usize, (i64, i64)>,
+    value_ranges: &mut BTreeMap<usize, (i64, i64)>,
+    value: RegisterState,
+    new_range: (i64, i64),
+) -> (i64, i64) {
+    let entry_modifier = |val: &mut (i64, i64)| {
+        let final_range = intersect_value_ranges(*val, new_range).unwrap();
+        *val = final_range;
+    };
+    match value {
+        RegisterState::Input(n) => match input_ranges.entry(n).and_modify(entry_modifier) {
+            Entry::Occupied(occ) => *occ.get(),
+            Entry::Vacant(_) => unreachable!(),
+        },
+        RegisterState::Unknown(n) => match value_ranges.entry(n).and_modify(entry_modifier) {
+            Entry::Occupied(occ) => *occ.get(),
+            Entry::Vacant(_) => unreachable!(),
+        },
+        RegisterState::Exact(n) => {
+            // Use the intersection function to ensure the ranges overlap. If they don't overlap,
+            // we've detected UB (or there's a bug in the range analysis).
+            intersect_value_ranges(new_range, (n, n)).unwrap()
+        }
+        RegisterState::Undefined => unreachable!(),
+    }
+}
+
+fn update_range_data_if_register(
+    input_ranges: &mut BTreeMap<usize, (i64, i64)>,
+    value_ranges: &mut BTreeMap<usize, (i64, i64)>,
+    operand: Operand,
+    registers: &[RegisterState; 4],
+    new_range: (i64, i64),
+) -> (i64, i64) {
+    match operand {
+        Operand::Register(Register(r)) => {
+            update_range_data(input_ranges, value_ranges, registers[r], new_range)
+        }
+        Operand::Literal(l) => {
+            // Use the intersection function to ensure the ranges overlap. If they don't overlap,
+            // we've detected UB (or there's a bug in the range analysis).
+            intersect_value_ranges(new_range, (l, l)).unwrap()
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+#[allow(clippy::type_complexity)]
+fn perform_input_range_analysis(
+    input_ranges: &mut BTreeMap<usize, (i64, i64)>,
+    value_ranges: &mut BTreeMap<usize, (i64, i64)>,
+    result_range: (i64, i64),
+    operand_value_range: (i64, i64),
+    source_value: RegisterState,
+    operand: Operand,
+    registers: &[RegisterState; 4],
+    source_range_func: fn((i64, i64), (i64, i64)) -> (i64, i64),
+    operand_range_func: fn((i64, i64), (i64, i64)) -> (i64, i64),
+) {
+    // It's maybe possible that updating range data for one input may allow
+    // the other input's range to also be narrowed. Allow each input's range
+    // to be updated after the other input's range, to ensure convergence in any case.
+    let source_value_range = update_range_data(
+        input_ranges,
+        value_ranges,
+        source_value,
+        source_range_func(result_range, operand_value_range),
+    );
+    let operand_value_range = update_range_data_if_register(
+        input_ranges,
+        value_ranges,
+        operand,
+        registers,
+        operand_range_func(result_range, source_value_range),
+    );
+    update_range_data(
+        input_ranges,
+        value_ranges,
+        source_value,
+        source_range_func(result_range, operand_value_range),
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn add_input_range_analysis(
+    input_ranges: &mut BTreeMap<usize, (i64, i64)>,
+    value_ranges: &mut BTreeMap<usize, (i64, i64)>,
+    result_range: (i64, i64),
+    _source_value_range: (i64, i64),
+    operand_value_range: (i64, i64),
+    source_value: RegisterState,
+    operand: Operand,
+    registers: &[RegisterState; 4],
+) {
+    perform_input_range_analysis(
+        input_ranges,
+        value_ranges,
+        result_range,
+        operand_value_range,
+        source_value,
+        operand,
+        registers,
+        sub_range_analysis,
+        sub_range_analysis,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn mul_input_range_analysis(
+    input_ranges: &mut BTreeMap<usize, (i64, i64)>,
+    value_ranges: &mut BTreeMap<usize, (i64, i64)>,
+    result_range: (i64, i64),
+    source_value_range: (i64, i64),
+    operand_value_range: (i64, i64),
+    source_value: RegisterState,
+    operand: Operand,
+    registers: &[RegisterState; 4],
+) {
+    if result_range == (0, 0) {
+        // This is a special case, since we don't want
+        // to divide by zero in the range analysis.
+        //
+        // Approach:
+        // - If exactly one of the two mul input ranges contains 0,
+        //   that range must be exactly (0, 0).
+        // - If both mul input ranges contain 0, then we have no information.
+        //   We know that at least one of the inputs is always 0,
+        //   but we can't know which one -- and it's possible that both inputs
+        //   are zero sometimes. We simply have no way to tell.
+        // - If neither input range contains 0, we either have found UB
+        //   or a bug in the analysis.
+        let source_range = source_value_range.0..=source_value_range.1;
+        let operand_range = operand_value_range.0..=operand_value_range.1;
+        match (source_range.contains(&0), operand_range.contains(&0)) {
+            (true, false) => {
+                // The source range must be (0, 0).
+                update_range_data(input_ranges, value_ranges, source_value, (0, 0));
+            }
+            (false, true) => {
+                // The operand range must be (0, 0).
+                update_range_data_if_register(
+                    input_ranges,
+                    value_ranges,
+                    operand,
+                    registers,
+                    (0, 0),
+                );
+            }
+            (true, true) => {} // No information, see comment above.
+            (false, false) => unreachable!(),
+        }
+    } else {
+        perform_input_range_analysis(
+            input_ranges,
+            value_ranges,
+            result_range,
+            operand_value_range,
+            source_value,
+            operand,
+            registers,
+            |result, operand| {
+                if operand == (0, 0) {
+                    MAX_VALUE_RANGE
+                } else {
+                    div_range_analysis(result, operand)
+                }
+            },
+            |result, source| {
+                if source == (0, 0) {
+                    MAX_VALUE_RANGE
+                } else {
+                    div_range_analysis(result, source)
+                }
+            },
+        );
+    }
+}
+
+
+#[allow(clippy::too_many_arguments)]
+fn div_input_range_analysis(
+    input_ranges: &mut BTreeMap<usize, (i64, i64)>,
+    value_ranges: &mut BTreeMap<usize, (i64, i64)>,
+    result_range: (i64, i64),
+    _source_value_range: (i64, i64),
+    operand_value_range: (i64, i64),
+    source_value: RegisterState,
+    operand: Operand,
+    registers: &[RegisterState; 4],
+) {
+    perform_input_range_analysis(
+        input_ranges,
+        value_ranges,
+        result_range,
+        operand_value_range,
+        source_value,
+        operand,
+        registers,
+        inv_div_range_analysis,
+        |result, source| {
+            if result == (0, 0) {
+                MAX_VALUE_RANGE
+            } else {
+                div_range_analysis(source, result)
+            }
+        },
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn equal_input_range_analysis(
+    input_ranges: &mut BTreeMap<usize, (i64, i64)>,
+    value_ranges: &mut BTreeMap<usize, (i64, i64)>,
+    result_range: (i64, i64),
+    mut source_value_range: (i64, i64),
+    mut operand_value_range: (i64, i64),
+    source_value: RegisterState,
+    operand: Operand,
+    registers: &[RegisterState; 4],
+) {
+    // There's only stuff to be learned if the instruction's output range is exact.
+    if result_range.0 == result_range.1 {
+        if result_range.0 == 1 {
+            // The inputs are known-equal, their actual ranges are the intersection of
+            // their prior ranges.
+            let intersection =
+                intersect_value_ranges(source_value_range, operand_value_range).unwrap();
+
+            update_range_data(input_ranges, value_ranges, source_value, intersection);
+            update_range_data_if_register(
+                input_ranges,
+                value_ranges,
+                operand,
+                registers,
+                intersection,
+            );
+        } else if result_range.0 == 0 {
+            // The inputs are known-unequal. This isn't much information -- if one
+            // of the ranges is exact, and if that value is on the boundary of the other
+            // input's range, then we can shrink that input's range by one.
+            // Nothing else that can be expressed in our range analysis can be known.
+            //
+            // This loop ensures that both the check of source_value_range and
+            // the check of operand_value_range run at least once before the other.
+            // This is because each of them can prune the range and allow the other
+            // to prune its range (or detect UB and panic).
+            for _ in 0..2 {
+                if source_value_range.0 == source_value_range.1 {
+                    if source_value_range.0 == operand_value_range.0 {
+                        operand_value_range.0 += 1;
+                    }
+                    if source_value_range.0 == operand_value_range.1 {
+                        operand_value_range.1 -= 1;
+                    }
+                    assert!(operand_value_range.0 <= operand_value_range.1);
+                }
+                if operand_value_range.0 == operand_value_range.1 {
+                    if operand_value_range.0 == source_value_range.0 {
+                        source_value_range.0 += 1;
+                    }
+                    if operand_value_range.0 == source_value_range.1 {
+                        source_value_range.1 -= 1;
+                    }
+                    assert!(source_value_range.0 <= source_value_range.1);
+                }
+            }
+            update_range_data(input_ranges, value_ranges, source_value, source_value_range);
+            update_range_data_if_register(
+                input_ranges,
+                value_ranges,
+                operand,
+                registers,
+                operand_value_range,
+            );
+        }
+    }
+}
+
 #[allow(clippy::type_complexity)]
 fn backpropagate_range_analysis(
     value_definitions: &BTreeMap<usize, ([RegisterState; 4], &Instruction)>,
@@ -792,31 +1162,27 @@ fn backpropagate_range_analysis(
         (0..num_inputs).map(|x| (x, INPUT_VALUE_RANGE)).collect();
     let mut value_ranges: BTreeMap<usize, (i64, i64)> = forward_range_analysis.clone();
 
-    let mut range_iter = forward_range_analysis.iter().rev();
-    let (final_value, forward_range) = range_iter.next().unwrap();
-
+    // The final value's range is known ahead of time, update its entry.
+    let (final_value, forward_range) = forward_range_analysis.iter().last().unwrap();
     let final_value_range = intersect_value_ranges(*forward_range, final_value_range).unwrap();
     value_ranges.insert(*final_value, final_value_range);
 
-    for (&value_id, &forward_range) in range_iter {
+    // Begin the analysis pass, going backward from the last instruction toward the first.
+    for (&value_id, &forward_range) in forward_range_analysis.iter().rev() {
         let (registers, instr) = value_definitions[&value_id];
         let range = intersect_value_ranges(forward_range, value_ranges[&value_id]).unwrap();
 
         let destination = instr.destination().0;
         let source_value = registers[destination];
         let operand = instr.operand().unwrap();
-        let operand_register_value = match operand {
-            Operand::Literal(_) => None,
-            Operand::Register(Register(r)) => Some(registers[r]),
-        };
 
-        let mut source_value_range = match source_value {
+        let source_value_range = match source_value {
             RegisterState::Exact(n) => (n, n),
             RegisterState::Input(n) => input_ranges[&n],
             RegisterState::Unknown(n) => value_ranges[&n],
             RegisterState::Undefined => unreachable!(),
         };
-        let mut operand_value_range = match operand {
+        let operand_value_range = match operand {
             Operand::Literal(l) => (l, l),
             Operand::Register(Register(reg)) => {
                 let register_value = registers[reg];
@@ -857,126 +1223,76 @@ fn backpropagate_range_analysis(
         // Is this true? If the node wasn't worth exploring, why is its value Unknown?
         assert!(worth_exploring);
 
+        println!("*** range analysis ***");
+        println!("{}", *instr);
+        println!(
+            "{:?} {:?} -> {:?}",
+            source_value_range, operand_value_range, range
+        );
+
         match *instr {
             Instruction::Input(_) => {
                 // RegisterState::Unknown values cannot originate from an Input instruction.
                 unreachable!()
             }
             Instruction::Add(_, _) => {
-                todo!()
-            },
-            Instruction::Mul(Register(reg), Operand::Literal(l)) => {
-                // todo!()
+                add_input_range_analysis(
+                    &mut input_ranges,
+                    &mut value_ranges,
+                    range,
+                    source_value_range,
+                    operand_value_range,
+                    source_value,
+                    operand,
+                    &registers,
+                );
             }
-            Instruction::Mul(Register(lreg), Operand::Register(Register(rreg))) => {
-                // todo!()
+            Instruction::Mul(_, _) => {
+                mul_input_range_analysis(
+                    &mut input_ranges,
+                    &mut value_ranges,
+                    range,
+                    source_value_range,
+                    operand_value_range,
+                    source_value,
+                    operand,
+                    &registers,
+                );
             }
-            Instruction::Div(Register(reg), Operand::Literal(l)) => {
-                // todo!()
-            }
-            Instruction::Div(Register(lreg), Operand::Register(Register(rreg))) => {
-                // todo!()
-            }
+            Instruction::Div(_, _) => div_input_range_analysis(
+                &mut input_ranges,
+                &mut value_ranges,
+                range,
+                source_value_range,
+                operand_value_range,
+                source_value,
+                operand,
+                &registers,
+            ),
             Instruction::Mod(_, _) => {
-                // The source register's value must be >= 0, or else it's UB.
-                // If the operand is a register, we know it must be > 0 or else it's UB.
-                let non_ub_source = (0, MAX_VALUE_RANGE.1);
-                let non_ub_operand = (1, MAX_VALUE_RANGE.1);
-                match source_value {
-                    RegisterState::Input(i) => {
-                        input_ranges.entry(i).and_modify(|val| {
-                            let intersection = intersect_value_ranges(*val, non_ub_source).unwrap();
-                            *val = intersection;
-                        });
-                    }
-                    RegisterState::Unknown(u) => {
-                        value_ranges.entry(u).and_modify(|val| {
-                            let intersection = intersect_value_ranges(*val, non_ub_source).unwrap();
-                            *val = intersection;
-                        });
-                    }
-                    _ => {}
-                }
-                match operand_register_value {
-                    Some(RegisterState::Input(i)) => {
-                        input_ranges.entry(i).and_modify(|val| {
-                            let intersection =
-                                intersect_value_ranges(*val, non_ub_operand).unwrap();
-                            *val = intersection;
-                        });
-                    }
-                    Some(RegisterState::Unknown(u)) => {
-                        value_ranges.entry(u).and_modify(|val| {
-                            let intersection =
-                                intersect_value_ranges(*val, non_ub_operand).unwrap();
-                            *val = intersection;
-                        });
-                    }
-                    _ => {}
-                }
+                // Our range representation doesn't allow any new information to be learned via
+                // backpropagating range analysis through mod instructions. The only information
+                // we could learn here is in the case where range analysis determines the mod
+                // instruction is a no-op: the source range is completely within the operand range.
+                // In that case, we know the result range is equal to the source range, but we
+                // also know something much stronger -- the source value EQUALS the result value.
+                // So rather than adjusting ranges, we will update the value numbering to reflect
+                // this equality. This is strictly superior to backpropagating range analysis
+                // through mod instructions.
             }
-            Instruction::Equal(_, _) => {
-                // There's only stuff to be learned if the instruction's output range is exact.
-                if range.0 == range.1 {
-                    if range.0 == 1 {
-                        // The inputs are known-equal, their actual ranges are the intersection of
-                        // their prior ranges.
-                        let intersection =
-                            intersect_value_ranges(source_value_range, operand_value_range)
-                                .unwrap();
-
-                        match source_value {
-                            RegisterState::Input(i) => {
-                                input_ranges.insert(i, intersection);
-                            }
-                            RegisterState::Unknown(u) => {
-                                value_ranges.insert(u, intersection);
-                            }
-                            _ => {}
-                        }
-                        match operand_register_value {
-                            Some(RegisterState::Input(i)) => {
-                                input_ranges.insert(i, intersection);
-                            }
-                            Some(RegisterState::Unknown(u)) => {
-                                value_ranges.insert(u, intersection);
-                            }
-                            _ => {}
-                        }
-                    } else if range.0 == 0 {
-                        // The inputs are known-unequal. This isn't much information -- if one
-                        // of the ranges is exact, and if that value is on the boundary of the other
-                        // input's range, then we can shrink that input's range by one.
-                        // Nothing else that can be expressed in our range analysis can be known.
-                        //
-                        // This loop ensures that both the check of source_value_range and
-                        // the check of operand_value_range run at least once before the other.
-                        // This is because each of them can prune the range and allow the other
-                        // to prune its range (or detect UB and panic).
-                        for _ in 0..2 {
-                            if source_value_range.0 == source_value_range.1 {
-                                if source_value_range.0 == operand_value_range.0 {
-                                    operand_value_range.0 += 1;
-                                }
-                                if source_value_range.0 == operand_value_range.1 {
-                                    operand_value_range.1 -= 1;
-                                }
-                                assert!(operand_value_range.0 <= operand_value_range.1);
-                            }
-                            if operand_value_range.0 == operand_value_range.1 {
-                                if operand_value_range.0 == source_value_range.0 {
-                                    source_value_range.0 += 1;
-                                }
-                                if operand_value_range.0 == source_value_range.1 {
-                                    source_value_range.1 -= 1;
-                                }
-                                assert!(source_value_range.0 <= source_value_range.1);
-                            }
-                        }
-                    }
-                }
-            }
+            Instruction::Equal(_, _) => equal_input_range_analysis(
+                &mut input_ranges,
+                &mut value_ranges,
+                range,
+                source_value_range,
+                operand_value_range,
+                source_value,
+                operand,
+                &registers,
+            ),
         }
+
+        println!("*** end ***\n");
     }
 
     (input_ranges, value_ranges)
@@ -1059,6 +1375,10 @@ fn prune_no_ops(data: &[Instruction]) -> Vec<Instruction> {
             println!("\ninput deps:\n{:?}\n", input_dependencies);
             println!("\nvalue deps:\n{:?}\n", value_dependencies);
 
+            println!("value {}: {:?}", 135, value_ranges[&135]);
+            println!("value {}: {:?}", 134, value_ranges[&134]);
+            println!("value {}: {:?}", 132, value_ranges[&132]);
+
             let dead_values: BTreeSet<usize> = value_definitions
                 .keys()
                 .copied()
@@ -1101,11 +1421,14 @@ fn solve_part2(data: &[Instruction]) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use std::cmp::{max, min};
+    use std::{cmp::{max, min}, collections::BTreeMap};
 
     use itertools::Itertools;
 
-    use crate::{div_range_analysis, equal_range_analysis, mul_range_analysis, mod_range_analysis, add_range_analysis, sub_range_analysis};
+    use crate::{
+        add_range_analysis, div_range_analysis, equal_range_analysis, inv_div_range_analysis,
+        mod_range_analysis, mul_range_analysis, sub_range_analysis, RegisterState, parser::{Operand, Register}, add_input_range_analysis, MAX_VALUE_RANGE, mul_input_range_analysis, div_input_range_analysis,
+    };
 
     #[test]
     fn test_div_range_analysis() {
@@ -1178,6 +1501,64 @@ mod tests {
                         expected_range,
                         source,
                         multiplier,
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_inv_div_range_analysis() {
+        let test_range = -10i64..=10i64;
+        let pairs = test_range.clone().cartesian_product(test_range);
+        let range_pairs = pairs.clone().cartesian_product(pairs);
+
+        for (result_range, operand_range) in range_pairs {
+            let result_range = (
+                min(result_range.0, result_range.1),
+                max(result_range.0, result_range.1),
+            );
+            let operand_range = (
+                min(operand_range.0, operand_range.1),
+                max(operand_range.0, operand_range.1),
+            );
+
+            let expected_range = inv_div_range_analysis(result_range, operand_range);
+            let range = expected_range.0..=expected_range.1;
+
+            // Ensure all source values in the calculated range satisfy the operation.
+            for source in expected_range.0..=expected_range.1 {
+                for operand in operand_range.0..=operand_range.1 {
+                    let result = source / operand;
+                    assert!(
+                        (result_range.0..=result_range.1).contains(&result),
+                        "{:?} / {:?} -> {:?} for {} / {}",
+                        expected_range,
+                        operand_range,
+                        result_range,
+                        source,
+                        operand,
+                    );
+                }
+            }
+
+            // Ensure that values outside the calculated range do not satisfy the operation.
+            for source in [
+                expected_range.0 - 2,
+                expected_range.0 - 1,
+                expected_range.1 + 1,
+                expected_range.1 + 2,
+            ] {
+                for operand in operand_range.0..=operand_range.1 {
+                    let result = source / operand;
+                    assert!(
+                        !(result_range.0..=result_range.1).contains(&result),
+                        "{:?} / {:?} -> {:?} for {} / {}",
+                        range,
+                        operand_range,
+                        result_range,
+                        source,
+                        operand,
                     );
                 }
             }
@@ -1297,7 +1678,9 @@ mod tests {
             .cartesian_product(source_test_range);
 
         let operand_test_range = 1i64..=20i64;
-        let operand_pairs = operand_test_range.clone().cartesian_product(operand_test_range);
+        let operand_pairs = operand_test_range
+            .clone()
+            .cartesian_product(operand_test_range);
         let range_pairs = source_pairs.cartesian_product(operand_pairs);
 
         for (source_range, operand_range) in range_pairs {
@@ -1325,6 +1708,295 @@ mod tests {
                         operand,
                     );
                 }
+            }
+        }
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn execute_input_range_analysis(
+        result_range: (i64, i64),
+        source_range: (i64, i64),
+        operand_range: (i64, i64),
+        input_range_func: fn(
+            &mut BTreeMap<usize, (i64, i64)>,
+            &mut BTreeMap<usize, (i64, i64)>,
+            (i64, i64),
+            (i64, i64),
+            (i64, i64),
+            RegisterState,
+            Operand,
+            &[RegisterState; 4]
+        ),
+    ) -> ((i64, i64), (i64, i64)) {
+        let mut input_ranges: BTreeMap<usize, (i64, i64)> = Default::default();
+        let mut value_ranges: BTreeMap<usize, (i64, i64)> = [
+            (0, source_range),
+            (1, operand_range),
+            (2, result_range),
+        ].into_iter().collect();
+
+        input_range_func(
+            &mut input_ranges,
+            &mut value_ranges,
+            result_range,
+            source_range,
+            operand_range,
+            RegisterState::Unknown(0),
+            Operand::Register(Register(1)),
+            &[
+                // the register state before the instruction executed
+                RegisterState::Unknown(0),
+                RegisterState::Unknown(1),
+                RegisterState::Exact(0),
+                RegisterState::Exact(0),
+            ],
+        );
+
+        (value_ranges[&0], value_ranges[&1])
+    }
+
+    #[test]
+    fn test_add_input_range_analysis() {
+        let source_test_range = -10i64..=10i64;
+        let source_pairs = source_test_range
+            .clone()
+            .cartesian_product(source_test_range);
+
+        let operand_test_range = -10i64..=10i64;
+        let operand_pairs = operand_test_range
+            .clone()
+            .cartesian_product(operand_test_range);
+        let range_pairs = source_pairs.cartesian_product(operand_pairs);
+
+        for (source_range, operand_range) in range_pairs {
+            let source_range = (
+                min(source_range.0, source_range.1),
+                max(source_range.0, source_range.1),
+            );
+            let operand_range = (
+                min(operand_range.0, operand_range.1),
+                max(operand_range.0, operand_range.1),
+            );
+
+            let result_range = add_range_analysis(source_range, operand_range);
+
+            let (recovered_source_range, recovered_operand_range) = execute_input_range_analysis(
+                result_range,
+                MAX_VALUE_RANGE,
+                operand_range,
+                add_input_range_analysis,
+            );
+            assert_eq!(recovered_operand_range, operand_range);
+            for source in recovered_source_range.0..=recovered_source_range.1 {
+                assert!((operand_range.0..=operand_range.1).any(|operand| {
+                    (result_range.0..=result_range.1).contains(&(source + operand))
+                }));
+            }
+
+            let (recovered_source_range, recovered_operand_range) = execute_input_range_analysis(
+                result_range,
+                source_range,
+                MAX_VALUE_RANGE,
+                add_input_range_analysis,
+            );
+            assert_eq!(recovered_source_range, source_range);
+            for operand in recovered_operand_range.0..=recovered_operand_range.1 {
+                assert!((source_range.0..=source_range.1).any(|source| {
+                    (result_range.0..=result_range.1).contains(&(source + operand))
+                }));
+            }
+        }
+    }
+
+    #[test]
+    fn test_mul_input_range_analysis_special() {
+        let source = (23, 25);
+        let operand = (0, 1);
+        let result = (0, 5);
+
+        // The known result range is no wider than the computed result range.
+        let computed_result = mul_range_analysis(source, operand);
+        assert!(computed_result.0 <= result.0);
+        assert!(computed_result.1 >= result.1);
+
+        let (computed_source, computed_operand) = execute_input_range_analysis(
+            result,
+            source,
+            operand,
+            mul_input_range_analysis,
+        );
+        assert_eq!(computed_source, (23, 25));
+        assert_eq!(computed_operand, (0, 0));
+    }
+
+    #[test]
+    fn test_mul_input_range_analysis() {
+        let source_test_range = -10i64..=10i64;
+        let source_pairs = source_test_range
+            .clone()
+            .cartesian_product(source_test_range);
+
+        let operand_test_range = -10i64..=10i64;
+        let operand_pairs = operand_test_range
+            .clone()
+            .cartesian_product(operand_test_range);
+        let range_pairs = source_pairs.cartesian_product(operand_pairs);
+
+        for (source_range, operand_range) in range_pairs {
+            let source_range = (
+                min(source_range.0, source_range.1),
+                max(source_range.0, source_range.1),
+            );
+            let operand_range = (
+                min(operand_range.0, operand_range.1),
+                max(operand_range.0, operand_range.1),
+            );
+
+            let result_range = mul_range_analysis(source_range, operand_range);
+
+            let (recovered_source_range, recovered_operand_range) = execute_input_range_analysis(
+                result_range,
+                MAX_VALUE_RANGE,
+                operand_range,
+                mul_input_range_analysis,
+            );
+            println!("inf {:?} {:?} -> {:?} {:?}", operand_range, result_range, recovered_source_range, recovered_operand_range);
+            assert_eq!(recovered_operand_range, operand_range);
+            for source in recovered_source_range.0..=recovered_source_range.1 {
+                println!("{} * {:?} => {:?}", source, operand_range, result_range);
+                assert!((operand_range.0..=operand_range.1).any(|operand| {
+                    (result_range.0..=result_range.1).contains(&(source * operand))
+                }));
+            }
+
+            let (recovered_source_range, recovered_operand_range) = execute_input_range_analysis(
+                result_range,
+                source_range,
+                MAX_VALUE_RANGE,
+                mul_input_range_analysis,
+            );
+            println!("{:?} inf {:?} -> {:?} {:?}", source_range, result_range, recovered_source_range, recovered_operand_range);
+            assert_eq!(recovered_source_range, source_range);
+            for operand in recovered_operand_range.0..=recovered_operand_range.1 {
+                println!("{:?} * {} => {:?}", source_range, operand, result_range);
+                assert!((source_range.0..=source_range.1).any(|source| {
+                    (result_range.0..=result_range.1).contains(&(source * operand))
+                }));
+            }
+        }
+    }
+
+    #[test]
+    fn test_div_input_range_analysis_special() {
+        let source = (-1000, 500);
+        let operand = (-10, 0);
+        let result = (1, 10);
+
+        // The known result range is no wider than the computed result range.
+        let computed_result = div_range_analysis(source, operand);
+        assert!(computed_result.0 <= result.0);
+        assert!(computed_result.1 >= result.1);
+
+        let (computed_source, computed_operand) = execute_input_range_analysis(
+            result,
+            source,
+            operand,
+            div_input_range_analysis,
+        );
+        assert_eq!(computed_source, (-109, -1));
+        assert_eq!(computed_operand, (-10, 0));
+    }
+
+    #[test]
+    fn test_div_input_range_analysis_special2() {
+        let source = (-10, -10);
+        let operand = (-500, 300);
+        let result = (-10, 10);
+
+        // The known result range is no wider than the computed result range.
+        let computed_result = div_range_analysis(source, operand);
+        assert!(computed_result.0 <= result.0);
+        assert!(computed_result.1 >= result.1);
+
+        let (computed_source, computed_operand) = execute_input_range_analysis(
+            result,
+            source,
+            operand,
+            div_input_range_analysis,
+        );
+        assert_eq!(computed_source, (-10, -10));
+        assert_eq!(computed_operand, (-10, 10));
+    }
+
+    #[test]
+    fn test_div_input_range_analysis() {
+        let source_test_range = -10i64..=10i64;
+        let source_pairs = source_test_range
+            .clone()
+            .cartesian_product(source_test_range);
+
+        let operand_test_range = -10i64..=10i64;
+        let operand_pairs = operand_test_range
+            .clone()
+            .cartesian_product(operand_test_range);
+        let range_pairs = source_pairs.cartesian_product(operand_pairs);
+
+        for (source_range, operand_range) in range_pairs {
+            if operand_range == (0, 0) {
+                continue;
+            }
+
+            let source_range = (
+                min(source_range.0, source_range.1),
+                max(source_range.0, source_range.1),
+            );
+            let operand_range = (
+                min(operand_range.0, operand_range.1),
+                max(operand_range.0, operand_range.1),
+            );
+
+            let result_range = div_range_analysis(source_range, operand_range);
+
+            let (recovered_source_range, recovered_operand_range) = execute_input_range_analysis(
+                result_range,
+                MAX_VALUE_RANGE,
+                operand_range,
+                div_input_range_analysis,
+            );
+            println!("inf {:?} {:?} -> {:?} {:?}", operand_range, result_range, recovered_source_range, recovered_operand_range);
+            assert_eq!(recovered_operand_range, operand_range);
+            assert!(recovered_source_range.0.abs() <= 1000);
+            assert!(recovered_source_range.1.abs() <= 1000);
+            for source in recovered_source_range.0..=recovered_source_range.1 {
+                println!("{} / {:?} => {:?}", source, operand_range, result_range);
+                assert!((operand_range.0..=operand_range.1).any(|operand| {
+                    if operand == 0 {
+                        false
+                    } else {
+                        (result_range.0..=result_range.1).contains(&(source / operand))
+                    }
+                }));
+            }
+
+            let (recovered_source_range, recovered_operand_range) = execute_input_range_analysis(
+                result_range,
+                source_range,
+                MAX_VALUE_RANGE,
+                div_input_range_analysis,
+            );
+            println!("{:?} inf {:?} -> {:?} {:?}", source_range, result_range, recovered_source_range, recovered_operand_range);
+            assert_eq!(recovered_source_range, source_range);
+            assert!(recovered_operand_range.0.abs() <= 1000);
+            assert!(recovered_operand_range.1.abs() <= 1000);
+            for operand in recovered_operand_range.0..=recovered_operand_range.1 {
+                println!("{:?} / {} => {:?}", source_range, operand, result_range);
+                assert!((source_range.0..=source_range.1).any(|source| {
+                    if operand == 0 {
+                        false
+                    } else {
+                        (result_range.0..=result_range.1).contains(&(source / operand))
+                    }
+                }));
             }
         }
     }
