@@ -198,7 +198,7 @@ fn process<'a>(start: Simulation<'a>) -> Box<dyn Iterator<Item = Simulation<'a>>
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum RegisterState {
+enum ProgramValue {
     Exact(i64),
     Input(usize),
     Unknown(usize),
@@ -209,15 +209,15 @@ enum RegisterState {
 fn perform_constant_propagation_and_value_numbering(
     data: &[Instruction],
 ) -> (
-    Vec<[RegisterState; 4]>,
-    BTreeMap<usize, ([RegisterState; 4], &Instruction)>,
+    Vec<[ProgramValue; 4]>,
+    BTreeMap<usize, ([ProgramValue; 4], &Instruction)>,
 ) {
-    let mut state = [RegisterState::Exact(0); 4];
+    let mut state = [ProgramValue::Exact(0); 4];
     let mut inputs = 0usize;
 
     // Perform value-numbering and remember how each unknown value came to be:
     // (registers prior to instruction, instruction)
-    let mut value_definitions: BTreeMap<usize, ([RegisterState; 4], &Instruction)> =
+    let mut value_definitions: BTreeMap<usize, ([ProgramValue; 4], &Instruction)> =
         Default::default();
 
     let state_ref = &mut state;
@@ -231,169 +231,169 @@ fn perform_constant_propagation_and_value_numbering(
             let destination = instr.destination().0;
             let source_value = state_ref[destination];
             let operand_value = match instr.operand() {
-                Some(Operand::Literal(l)) => RegisterState::Exact(l),
+                Some(Operand::Literal(l)) => ProgramValue::Exact(l),
                 Some(Operand::Register(r)) => state_ref[r.0],
-                _ => RegisterState::Undefined,
+                _ => ProgramValue::Undefined,
             };
 
             match *instr {
                 Instruction::Input(Register(reg)) => {
                     let input_number = *inputs_ref;
                     *inputs_ref += 1;
-                    next_state[reg] = RegisterState::Input(input_number);
+                    next_state[reg] = ProgramValue::Input(input_number);
                 }
                 Instruction::Add(_, _) => {
                     next_state[destination] = match (source_value, operand_value) {
-                        (RegisterState::Undefined, _) | (_, RegisterState::Undefined) => {
+                        (ProgramValue::Undefined, _) | (_, ProgramValue::Undefined) => {
                             unreachable!()
                         }
-                        (RegisterState::Exact(a), RegisterState::Exact(b)) => {
-                            RegisterState::Exact(a + b)
+                        (ProgramValue::Exact(a), ProgramValue::Exact(b)) => {
+                            ProgramValue::Exact(a + b)
                         }
-                        (RegisterState::Exact(0), _) => operand_value,
-                        (_, RegisterState::Exact(0)) => source_value,
-                        (RegisterState::Unknown(_), _)
-                        | (_, RegisterState::Unknown(_))
-                        | (RegisterState::Input(_), RegisterState::Input(_))
-                        | (RegisterState::Exact(_), RegisterState::Input(_))
-                        | (RegisterState::Input(_), RegisterState::Exact(_)) => {
+                        (ProgramValue::Exact(0), _) => operand_value,
+                        (_, ProgramValue::Exact(0)) => source_value,
+                        (ProgramValue::Unknown(_), _)
+                        | (_, ProgramValue::Unknown(_))
+                        | (ProgramValue::Input(_), ProgramValue::Input(_))
+                        | (ProgramValue::Exact(_), ProgramValue::Input(_))
+                        | (ProgramValue::Input(_), ProgramValue::Exact(_)) => {
                             let value_number = value_definitions_ref.len();
                             value_definitions_ref
                                 .try_insert(value_number, (*state_ref, instr))
                                 .unwrap();
-                            RegisterState::Unknown(value_number)
+                            ProgramValue::Unknown(value_number)
                         }
                     };
                 }
                 Instruction::Mul(_, _) => {
                     next_state[destination] = match (source_value, operand_value) {
-                        (RegisterState::Undefined, _) | (_, RegisterState::Undefined) => {
+                        (ProgramValue::Undefined, _) | (_, ProgramValue::Undefined) => {
                             unreachable!()
                         }
-                        (RegisterState::Exact(a), RegisterState::Exact(b)) => {
-                            RegisterState::Exact(a * b)
+                        (ProgramValue::Exact(a), ProgramValue::Exact(b)) => {
+                            ProgramValue::Exact(a * b)
                         }
-                        (RegisterState::Exact(1), _) => operand_value,
-                        (_, RegisterState::Exact(1)) => source_value,
-                        (RegisterState::Exact(0), _) | (_, RegisterState::Exact(0)) => {
-                            RegisterState::Exact(0)
+                        (ProgramValue::Exact(1), _) => operand_value,
+                        (_, ProgramValue::Exact(1)) => source_value,
+                        (ProgramValue::Exact(0), _) | (_, ProgramValue::Exact(0)) => {
+                            ProgramValue::Exact(0)
                         }
-                        (RegisterState::Unknown(_), _)
-                        | (_, RegisterState::Unknown(_))
-                        | (RegisterState::Input(_), RegisterState::Input(_))
-                        | (RegisterState::Exact(_), RegisterState::Input(_))
-                        | (RegisterState::Input(_), RegisterState::Exact(_)) => {
+                        (ProgramValue::Unknown(_), _)
+                        | (_, ProgramValue::Unknown(_))
+                        | (ProgramValue::Input(_), ProgramValue::Input(_))
+                        | (ProgramValue::Exact(_), ProgramValue::Input(_))
+                        | (ProgramValue::Input(_), ProgramValue::Exact(_)) => {
                             let value_number = value_definitions_ref.len();
                             value_definitions_ref
                                 .try_insert(value_number, (*state_ref, instr))
                                 .unwrap();
-                            RegisterState::Unknown(value_number)
+                            ProgramValue::Unknown(value_number)
                         }
                     };
                 }
                 Instruction::Div(_, _) => {
                     next_state[destination] = match (source_value, operand_value) {
-                        (RegisterState::Undefined, _) | (_, RegisterState::Undefined) => {
+                        (ProgramValue::Undefined, _) | (_, ProgramValue::Undefined) => {
                             unreachable!()
                         }
-                        (_, RegisterState::Exact(0)) => {
+                        (_, ProgramValue::Exact(0)) => {
                             panic!("dividing by zero: {} {:?}", *instr, state_ref)
                         }
-                        (RegisterState::Exact(a), RegisterState::Exact(b)) => {
-                            RegisterState::Exact(a / b)
+                        (ProgramValue::Exact(a), ProgramValue::Exact(b)) => {
+                            ProgramValue::Exact(a / b)
                         }
-                        (RegisterState::Exact(0), _) | (_, RegisterState::Exact(1)) => source_value,
-                        (RegisterState::Unknown(a), RegisterState::Unknown(b)) if a == b => {
+                        (ProgramValue::Exact(0), _) | (_, ProgramValue::Exact(1)) => source_value,
+                        (ProgramValue::Unknown(a), ProgramValue::Unknown(b)) if a == b => {
                             // Both values are the same number, so they must be equal.
-                            RegisterState::Exact(1)
+                            ProgramValue::Exact(1)
                         }
-                        (RegisterState::Unknown(_), _)
-                        | (_, RegisterState::Unknown(_))
-                        | (RegisterState::Input(_), RegisterState::Input(_))
-                        | (RegisterState::Exact(_), RegisterState::Input(_))
-                        | (RegisterState::Input(_), RegisterState::Exact(_)) => {
+                        (ProgramValue::Unknown(_), _)
+                        | (_, ProgramValue::Unknown(_))
+                        | (ProgramValue::Input(_), ProgramValue::Input(_))
+                        | (ProgramValue::Exact(_), ProgramValue::Input(_))
+                        | (ProgramValue::Input(_), ProgramValue::Exact(_)) => {
                             let value_number = value_definitions_ref.len();
                             value_definitions_ref
                                 .try_insert(value_number, (*state_ref, instr))
                                 .unwrap();
-                            RegisterState::Unknown(value_number)
+                            ProgramValue::Unknown(value_number)
                         }
                     };
                 }
                 Instruction::Mod(_, _) => {
                     next_state[destination] = match (source_value, operand_value) {
-                        (RegisterState::Undefined, _) | (_, RegisterState::Undefined) => {
+                        (ProgramValue::Undefined, _) | (_, ProgramValue::Undefined) => {
                             unreachable!()
                         }
-                        (RegisterState::Exact(a), RegisterState::Exact(b)) => {
+                        (ProgramValue::Exact(a), ProgramValue::Exact(b)) => {
                             if a < 0 || b <= 0 {
                                 panic!(
                                     "illegal mod operands: {} {} {} {:?}",
                                     a, b, *instr, state_ref
                                 );
                             } else {
-                                RegisterState::Exact(a % b)
+                                ProgramValue::Exact(a % b)
                             }
                         }
-                        (_, RegisterState::Exact(1)) => source_value,
-                        (RegisterState::Unknown(a), RegisterState::Unknown(b)) if a == b => {
+                        (_, ProgramValue::Exact(1)) => source_value,
+                        (ProgramValue::Unknown(a), ProgramValue::Unknown(b)) if a == b => {
                             // Both values are the same number, so they must be equal.
                             // The modulus operation has the property that for all x, x % x == 0.
-                            RegisterState::Exact(0)
+                            ProgramValue::Exact(0)
                         }
-                        (RegisterState::Unknown(_), _)
-                        | (_, RegisterState::Unknown(_))
-                        | (RegisterState::Input(_), RegisterState::Input(_))
-                        | (RegisterState::Exact(_), RegisterState::Input(_))
-                        | (RegisterState::Input(_), RegisterState::Exact(_)) => {
+                        (ProgramValue::Unknown(_), _)
+                        | (_, ProgramValue::Unknown(_))
+                        | (ProgramValue::Input(_), ProgramValue::Input(_))
+                        | (ProgramValue::Exact(_), ProgramValue::Input(_))
+                        | (ProgramValue::Input(_), ProgramValue::Exact(_)) => {
                             let value_number = value_definitions_ref.len();
                             value_definitions_ref
                                 .try_insert(value_number, (*state_ref, instr))
                                 .unwrap();
-                            RegisterState::Unknown(value_number)
+                            ProgramValue::Unknown(value_number)
                         }
                     };
                 }
                 Instruction::Equal(_, _) => {
                     next_state[destination] = match (source_value, operand_value) {
-                        (RegisterState::Undefined, _) | (_, RegisterState::Undefined) => {
+                        (ProgramValue::Undefined, _) | (_, ProgramValue::Undefined) => {
                             unreachable!()
                         }
-                        (RegisterState::Exact(a), RegisterState::Exact(b)) => {
+                        (ProgramValue::Exact(a), ProgramValue::Exact(b)) => {
                             if a == b {
-                                RegisterState::Exact(1)
+                                ProgramValue::Exact(1)
                             } else {
-                                RegisterState::Exact(0)
+                                ProgramValue::Exact(0)
                             }
                         }
-                        (RegisterState::Input(a), RegisterState::Input(b)) if a == b => {
+                        (ProgramValue::Input(a), ProgramValue::Input(b)) if a == b => {
                             // These two registers' values are loaded from the same input step.
                             // It doesn't matter what their exact values are, they are always equal.
-                            RegisterState::Exact(1)
+                            ProgramValue::Exact(1)
                         }
-                        (RegisterState::Input(_), RegisterState::Exact(x))
-                        | (RegisterState::Exact(x), RegisterState::Input(_))
+                        (ProgramValue::Input(_), ProgramValue::Exact(x))
+                        | (ProgramValue::Exact(x), ProgramValue::Input(_))
                             if !(1..=9).contains(&x) =>
                         {
                             // One of the values is exactly equal to an input, whereas the other
                             // is outside of the range 1..=9 where all input values are guaranteed
                             // to fall. It's impossible for this equality to hold.
-                            RegisterState::Exact(0)
+                            ProgramValue::Exact(0)
                         }
-                        (RegisterState::Unknown(a), RegisterState::Unknown(b)) if a == b => {
+                        (ProgramValue::Unknown(a), ProgramValue::Unknown(b)) if a == b => {
                             // Both values are the same number, so they must be equal.
-                            RegisterState::Exact(1)
+                            ProgramValue::Exact(1)
                         }
-                        (RegisterState::Unknown(_), _)
-                        | (_, RegisterState::Unknown(_))
-                        | (RegisterState::Input(_), RegisterState::Input(_))
-                        | (RegisterState::Exact(_), RegisterState::Input(_))
-                        | (RegisterState::Input(_), RegisterState::Exact(_)) => {
+                        (ProgramValue::Unknown(_), _)
+                        | (_, ProgramValue::Unknown(_))
+                        | (ProgramValue::Input(_), ProgramValue::Input(_))
+                        | (ProgramValue::Exact(_), ProgramValue::Input(_))
+                        | (ProgramValue::Input(_), ProgramValue::Exact(_)) => {
                             let value_number = value_definitions_ref.len();
                             value_definitions_ref
                                 .try_insert(value_number, (*state_ref, instr))
                                 .unwrap();
-                            RegisterState::Unknown(value_number)
+                            ProgramValue::Unknown(value_number)
                         }
                     }
                 }
@@ -409,7 +409,7 @@ fn perform_constant_propagation_and_value_numbering(
 }
 
 fn find_input_and_value_dependencies_recursively(
-    value_definitions: &BTreeMap<usize, ([RegisterState; 4], &Instruction)>,
+    value_definitions: &BTreeMap<usize, ([ProgramValue; 4], &Instruction)>,
     target_unknown_value: usize,
     input_dependencies: &mut BTreeSet<usize>,
     value_dependencies: &mut BTreeSet<usize>,
@@ -418,7 +418,7 @@ fn find_input_and_value_dependencies_recursively(
 
     match instr {
         Instruction::Input(_) => {
-            // RegisterState::Unknown values cannot directly originate from an Input instruction.
+            // ProgramValue::Unknown values cannot directly originate from an Input instruction.
             unreachable!();
         }
         Instruction::Add(_, _)
@@ -437,11 +437,11 @@ fn find_input_and_value_dependencies_recursively(
 
             for state in states.into_iter().flatten() {
                 match state {
-                    RegisterState::Exact(_) => {}
-                    RegisterState::Input(n) => {
+                    ProgramValue::Exact(_) => {}
+                    ProgramValue::Input(n) => {
                         input_dependencies.insert(n);
                     }
-                    RegisterState::Unknown(n) => {
+                    ProgramValue::Unknown(n) => {
                         if value_dependencies.insert(n) {
                             // This is a newly-discovered dependency,
                             // recurse into it to see if there are more
@@ -454,7 +454,7 @@ fn find_input_and_value_dependencies_recursively(
                             );
                         }
                     }
-                    RegisterState::Undefined => unreachable!(),
+                    ProgramValue::Undefined => unreachable!(),
                 }
             }
         }
@@ -462,7 +462,7 @@ fn find_input_and_value_dependencies_recursively(
 }
 
 fn find_input_and_value_dependencies(
-    value_definitions: &BTreeMap<usize, ([RegisterState; 4], &Instruction)>,
+    value_definitions: &BTreeMap<usize, ([ProgramValue; 4], &Instruction)>,
     target_unknown_value: usize,
 ) -> (BTreeSet<usize>, BTreeSet<usize>) {
     let mut input_dependencies = BTreeSet::new();
@@ -483,13 +483,13 @@ const MAX_VALUE_RANGE: (i64, i64) = (i64::MIN, i64::MAX);
 
 fn get_value_range(
     prior_value_ranges: &BTreeMap<usize, (i64, i64)>,
-    register_state: RegisterState,
+    register_state: ProgramValue,
 ) -> (i64, i64) {
     match register_state {
-        RegisterState::Exact(n) => (n, n),
-        RegisterState::Input(_) => INPUT_VALUE_RANGE,
-        RegisterState::Unknown(n) => prior_value_ranges[&n],
-        RegisterState::Undefined => unreachable!(),
+        ProgramValue::Exact(n) => (n, n),
+        ProgramValue::Input(_) => INPUT_VALUE_RANGE,
+        ProgramValue::Unknown(n) => prior_value_ranges[&n],
+        ProgramValue::Undefined => unreachable!(),
     }
 }
 
@@ -1193,7 +1193,7 @@ fn inv_div_range_analysis(result: (i64, i64), mut divisor: (i64, i64)) -> (i64, 
 }
 
 fn value_range_analysis(
-    value_definitions: &BTreeMap<usize, ([RegisterState; 4], &Instruction)>,
+    value_definitions: &BTreeMap<usize, ([ProgramValue; 4], &Instruction)>,
 ) -> BTreeMap<usize, (i64, i64)> {
     // returned ranges are inclusive on both endpoints
     let mut result: BTreeMap<usize, (i64, i64)> = Default::default();
@@ -1205,7 +1205,7 @@ fn value_range_analysis(
             let destination = instr.destination().0;
             let source_value = registers[destination];
             let operand_value = match instr.operand().unwrap() {
-                Operand::Literal(l) => RegisterState::Exact(l),
+                Operand::Literal(l) => ProgramValue::Exact(l),
                 Operand::Register(r) => registers[r.0],
             };
 
@@ -1252,7 +1252,7 @@ fn value_range_analysis(
 fn update_range_data(
     input_ranges: &mut BTreeMap<usize, (i64, i64)>,
     value_ranges: &mut BTreeMap<usize, (i64, i64)>,
-    value: RegisterState,
+    value: ProgramValue,
     new_range: (i64, i64),
 ) -> (i64, i64) {
     let entry_modifier = |val: &mut (i64, i64)| {
@@ -1260,20 +1260,20 @@ fn update_range_data(
         *val = final_range;
     };
     match value {
-        RegisterState::Input(n) => match input_ranges.entry(n).and_modify(entry_modifier) {
+        ProgramValue::Input(n) => match input_ranges.entry(n).and_modify(entry_modifier) {
             Entry::Occupied(occ) => *occ.get(),
             Entry::Vacant(_) => unreachable!(),
         },
-        RegisterState::Unknown(n) => match value_ranges.entry(n).and_modify(entry_modifier) {
+        ProgramValue::Unknown(n) => match value_ranges.entry(n).and_modify(entry_modifier) {
             Entry::Occupied(occ) => *occ.get(),
             Entry::Vacant(_) => unreachable!(),
         },
-        RegisterState::Exact(n) => {
+        ProgramValue::Exact(n) => {
             // Use the intersection function to ensure the ranges overlap. If they don't overlap,
             // we've detected UB (or there's a bug in the range analysis).
             intersect_value_ranges(new_range, (n, n)).unwrap()
         }
-        RegisterState::Undefined => unreachable!(),
+        ProgramValue::Undefined => unreachable!(),
     }
 }
 
@@ -1281,7 +1281,7 @@ fn update_range_data_if_register(
     input_ranges: &mut BTreeMap<usize, (i64, i64)>,
     value_ranges: &mut BTreeMap<usize, (i64, i64)>,
     operand: Operand,
-    registers: &[RegisterState; 4],
+    registers: &[ProgramValue; 4],
     new_range: (i64, i64),
 ) -> (i64, i64) {
     match operand {
@@ -1303,9 +1303,9 @@ fn perform_input_range_analysis(
     value_ranges: &mut BTreeMap<usize, (i64, i64)>,
     result_range: (i64, i64),
     operand_value_range: (i64, i64),
-    source_value: RegisterState,
+    source_value: ProgramValue,
     operand: Operand,
-    registers: &[RegisterState; 4],
+    registers: &[ProgramValue; 4],
     source_range_func: fn((i64, i64), (i64, i64)) -> (i64, i64),
     operand_range_func: fn((i64, i64), (i64, i64)) -> (i64, i64),
     result_range_func: fn((i64, i64), (i64, i64)) -> (i64, i64),
@@ -1351,9 +1351,9 @@ fn add_input_range_analysis(
     result_range: (i64, i64),
     _source_value_range: (i64, i64),
     operand_value_range: (i64, i64),
-    source_value: RegisterState,
+    source_value: ProgramValue,
     operand: Operand,
-    registers: &[RegisterState; 4],
+    registers: &[ProgramValue; 4],
 ) {
     perform_input_range_analysis(
         input_ranges,
@@ -1375,9 +1375,9 @@ fn mul_input_range_analysis_for_zero_result(
     value_ranges: &mut BTreeMap<usize, (i64, i64)>,
     source_value_range: (i64, i64),
     operand_value_range: (i64, i64),
-    source_value: RegisterState,
+    source_value: ProgramValue,
     operand: Operand,
-    registers: &[RegisterState; 4],
+    registers: &[ProgramValue; 4],
 ) {
     // This is a special case, since we don't want
     // to divide by zero in the range analysis.
@@ -1415,9 +1415,9 @@ fn mul_input_range_analysis(
     mut result_range: (i64, i64),
     source_value_range: (i64, i64),
     operand_value_range: (i64, i64),
-    source_value: RegisterState,
+    source_value: ProgramValue,
     operand: Operand,
-    registers: &[RegisterState; 4],
+    registers: &[ProgramValue; 4],
 ) {
     // TODO: Re-enable this once it works properly.
     //
@@ -1489,9 +1489,9 @@ fn div_input_range_analysis(
     result_range: (i64, i64),
     _source_value_range: (i64, i64),
     operand_value_range: (i64, i64),
-    source_value: RegisterState,
+    source_value: ProgramValue,
     operand: Operand,
-    registers: &[RegisterState; 4],
+    registers: &[ProgramValue; 4],
 ) {
     perform_input_range_analysis(
         input_ranges,
@@ -1518,9 +1518,9 @@ fn equal_input_range_analysis(
     result_range: (i64, i64),
     mut source_value_range: (i64, i64),
     mut operand_value_range: (i64, i64),
-    source_value: RegisterState,
+    source_value: ProgramValue,
     operand: Operand,
-    registers: &[RegisterState; 4],
+    registers: &[ProgramValue; 4],
 ) {
     // There's only stuff to be learned if the instruction's output range is exact.
     if result_range.0 == result_range.1 {
@@ -1583,25 +1583,25 @@ fn equal_input_range_analysis(
 fn get_register_and_operand_ranges(
     input_ranges: &BTreeMap<usize, (i64, i64)>,
     value_ranges: &BTreeMap<usize, (i64, i64)>,
-    source_value: RegisterState,
+    source_value: ProgramValue,
     operand: Operand,
-    registers: &[RegisterState; 4],
+    registers: &[ProgramValue; 4],
 ) -> ((i64, i64), (i64, i64)) {
     let source_value_range = match source_value {
-        RegisterState::Exact(n) => (n, n),
-        RegisterState::Input(n) => input_ranges[&n],
-        RegisterState::Unknown(n) => value_ranges[&n],
-        RegisterState::Undefined => unreachable!(),
+        ProgramValue::Exact(n) => (n, n),
+        ProgramValue::Input(n) => input_ranges[&n],
+        ProgramValue::Unknown(n) => value_ranges[&n],
+        ProgramValue::Undefined => unreachable!(),
     };
     let operand_value_range = match operand {
         Operand::Literal(l) => (l, l),
         Operand::Register(Register(reg)) => {
             let register_value = registers[reg];
             match register_value {
-                RegisterState::Exact(n) => (n, n),
-                RegisterState::Input(n) => input_ranges[&n],
-                RegisterState::Unknown(n) => value_ranges[&n],
-                RegisterState::Undefined => unreachable!(),
+                ProgramValue::Exact(n) => (n, n),
+                ProgramValue::Input(n) => input_ranges[&n],
+                ProgramValue::Unknown(n) => value_ranges[&n],
+                ProgramValue::Undefined => unreachable!(),
             }
         }
     };
@@ -1611,7 +1611,7 @@ fn get_register_and_operand_ranges(
 
 #[allow(clippy::type_complexity)]
 fn backpropagate_range_analysis(
-    value_definitions: &BTreeMap<usize, ([RegisterState; 4], &Instruction)>,
+    value_definitions: &BTreeMap<usize, ([ProgramValue; 4], &Instruction)>,
     forward_range_analysis: &BTreeMap<usize, (i64, i64)>,
     num_inputs: usize,
     final_value_range: (i64, i64),
@@ -1653,7 +1653,7 @@ fn backpropagate_range_analysis(
         let worth_exploring = {
             if matches!(
                 source_value,
-                RegisterState::Input(_) | RegisterState::Unknown(_)
+                ProgramValue::Input(_) | ProgramValue::Unknown(_)
             ) {
                 true
             } else {
@@ -1663,7 +1663,7 @@ fn backpropagate_range_analysis(
                         let operand_value = registers[reg];
                         matches!(
                             operand_value,
-                            RegisterState::Input(_) | RegisterState::Unknown(_)
+                            ProgramValue::Input(_) | ProgramValue::Unknown(_)
                         )
                     }
                 }
@@ -1673,16 +1673,16 @@ fn backpropagate_range_analysis(
         // Is this true? If the node wasn't worth exploring, why is its value Unknown?
         assert!(worth_exploring);
 
-        println!("*** range analysis ***");
-        println!("{}", *instr);
-        println!(
-            "{:?} {:?} -> {:?}",
-            source_value_range, operand_value_range, range
-        );
+        // println!("*** range analysis ***");
+        // println!("{}", *instr);
+        // println!(
+        //     "{:?} {:?} -> {:?}",
+        //     source_value_range, operand_value_range, range
+        // );
 
         match *instr {
             Instruction::Input(_) => {
-                // RegisterState::Unknown values cannot originate from an Input instruction.
+                // ProgramValue::Unknown values cannot originate from an Input instruction.
                 unreachable!()
             }
             Instruction::Add(_, _) => {
@@ -1742,7 +1742,7 @@ fn backpropagate_range_analysis(
             ),
         }
 
-        println!("*** end ***\n");
+        // println!("*** end ***\n");
     }
 
     (input_ranges, value_ranges)
@@ -1759,7 +1759,7 @@ fn prune_no_ops(data: &[Instruction]) -> Vec<Instruction> {
         .iter()
         .flat_map(|rs| rs.iter())
         .filter_map(|s| match s {
-            RegisterState::Input(i) => Some(*i),
+            ProgramValue::Input(i) => Some(*i),
             _ => None,
         })
         .max()
@@ -1775,44 +1775,44 @@ fn prune_no_ops(data: &[Instruction]) -> Vec<Instruction> {
 
     let final_z_register = registers_after_instr.last().unwrap()[3];
     match final_z_register {
-        RegisterState::Undefined => unreachable!(),
-        RegisterState::Exact(n) => {
+        ProgramValue::Undefined => unreachable!(),
+        ProgramValue::Exact(n) => {
             // The inputs don't matter at all, the final z register value is a constant.
             vec![Instruction::Add(Register(3), Operand::Literal(n))]
         }
-        RegisterState::Input(n) => {
+        ProgramValue::Input(n) => {
             // The final z register value is equal to the n-th input (0-indexed).
             // We have to load the prior (n-1) input values to get to the n-th input,
             // so we emit n+1 "load input into z" instructions.
             vec![Instruction::Input(Register(3)); n + 1]
         }
-        RegisterState::Unknown(target_unknown) => {
+        ProgramValue::Unknown(target_unknown) => {
             // The final z register value is a numbered unknown value. Figure out what
             // inputs and unknown values influenced its value, and resume optimizing from there.
             let (input_dependencies, value_dependencies) =
                 find_input_and_value_dependencies(&value_definitions, target_unknown);
 
             let mut result: Vec<Instruction> = vec![];
-            let initial_state = [RegisterState::Exact(0); 4];
+            let initial_state = [ProgramValue::Exact(0); 4];
             let mut state = initial_state;
             for (registers, instr) in registers_after_instr.iter().zip(data.iter()) {
                 println!("{}", instr);
                 println!("{:?}", *registers);
 
                 let register_ranges = registers.map(|s| match s {
-                    RegisterState::Exact(x) => (x, x),
-                    RegisterState::Input(inp) => input_ranges[&inp],
-                    RegisterState::Unknown(unk) => value_ranges[&unk],
-                    RegisterState::Undefined => unreachable!(),
+                    ProgramValue::Exact(x) => (x, x),
+                    ProgramValue::Input(inp) => input_ranges[&inp],
+                    ProgramValue::Unknown(unk) => value_ranges[&unk],
+                    ProgramValue::Undefined => unreachable!(),
                 });
                 println!("{:?}", register_ranges);
 
                 // An operation is known to be a no-op if the state of all registers after the operation
                 // is the same as before the instruction.
                 // - This is true even if the instruction was an input, since all input instructions produce
-                //   a RegisterState::Input value with a new number.
-                // - This is true even if some of the non-destination registers are RegisterState::Unknown,
-                //   since unknowns are numbered, and a given numbered RegisterState::Unknown value
+                //   a ProgramValue::Input value with a new number.
+                // - This is true even if some of the non-destination registers are ProgramValue::Unknown,
+                //   since unknowns are numbered, and a given numbered ProgramValue::Unknown value
                 //   always represents the same value at all points in the program.
                 if state == *registers {
                     println!("  --> PRUNED");
@@ -1883,7 +1883,7 @@ mod tests {
         equal_range_analysis, inv_div_range_analysis, mod_range_analysis, mul_input_range_analysis,
         mul_range_analysis,
         parser::{Operand, Register},
-        sub_range_analysis, RegisterState, MAX_VALUE_RANGE,
+        sub_range_analysis, ProgramValue, MAX_VALUE_RANGE,
     };
 
     #[test]
@@ -2325,9 +2325,9 @@ mod tests {
             (i64, i64),
             (i64, i64),
             (i64, i64),
-            RegisterState,
+            ProgramValue,
             Operand,
-            &[RegisterState; 4],
+            &[ProgramValue; 4],
         ),
     ) -> ((i64, i64), (i64, i64)) {
         let mut input_ranges: BTreeMap<usize, (i64, i64)> = Default::default();
@@ -2342,14 +2342,14 @@ mod tests {
             result_range,
             source_range,
             operand_range,
-            RegisterState::Unknown(0),
+            ProgramValue::Unknown(0),
             Operand::Register(Register(1)),
             &[
                 // the register state before the instruction executed
-                RegisterState::Unknown(0),
-                RegisterState::Unknown(1),
-                RegisterState::Exact(0),
-                RegisterState::Exact(0),
+                ProgramValue::Unknown(0),
+                ProgramValue::Unknown(1),
+                ProgramValue::Exact(0),
+                ProgramValue::Exact(0),
             ],
         );
 
