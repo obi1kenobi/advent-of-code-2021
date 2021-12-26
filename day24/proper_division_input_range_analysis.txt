@@ -1,0 +1,18 @@
+// Proper division input range analysis must consider the current known range on the input
+// while attempting to update that range. Here's an example to illustrate:
+//
+// Solve (source / divisor) = result for source and divisor based on the current bounds.
+//    let source = (-30, -20);
+//    let divisor = (-26, 4);
+//    let result = (-1, 10);
+//
+// If not considering the current known range of divisor when updating it, then we decide
+// that the possible divisor range is (i64::MIN, i64::MAX) since both of those extreme points
+// will produce a valid result of 0. We then see that this is not a narrowing of the (-26, 4)
+// divisor range that is already known, and don't update the divisor at all.
+//
+// However, if are able to represent the divisor space as unions of ranges,
+// the possible i64 divisor values for the expression  (-30, -20) / divisor = (-1, 10) is:
+//      (i64::MIN, -2) union (20, i64::MAX)
+// Then intersecting with the previously-known divisor range of (-26, 4)
+// we see that we CAN shrink the divisor range to (-26, 4).
