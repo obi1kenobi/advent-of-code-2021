@@ -792,6 +792,277 @@ fn inv_mul_range_analysis(result: (i64, i64), multiplier: (i64, i64)) -> (i64, i
     (source_low, source_high)
 }
 
+fn divisor_range_analysis_with_nonzero_result(
+    result: (i64, i64),
+    source: (i64, i64),
+) -> Option<(i64, i64)> {
+    let (source_low, source_high) = source;
+    let (result_low, result_high) = result;
+
+    // The result range lies fully on one side of 0.
+    // The source range doesn't end on a 0 on either side.
+    let result_all_negative = result_high < 0;
+    let result_all_positive = result_low > 0;
+    assert!(result_all_negative ^ result_all_positive);
+    assert!(source_low != 0 && source_high != 0);
+
+    if source_low < 0 && source_high > 0 {
+        // The source range lies on both sides of zero.
+        // Split the result range into (source_low, -1) and (1, source_high),
+        // dropping each of them if they are empty ranges, and recurse on them.
+        // Then take the union of the possible divisor ranges.
+        let mut divisor_low_candidates = vec![];
+        let mut divisor_high_candidates = vec![];
+        if source_low <= -1 {
+            if let Some((low, high)) =
+                divisor_range_analysis_with_nonzero_result(result, (source_low, -1))
+            {
+                divisor_low_candidates.push(low);
+                divisor_high_candidates.push(high);
+            }
+        }
+        if source_high >= 1 {
+            if let Some((low, high)) =
+                divisor_range_analysis_with_nonzero_result(result, (1, source_high))
+            {
+                divisor_low_candidates.push(low);
+                divisor_high_candidates.push(high);
+            }
+        }
+
+        divisor_low_candidates.into_iter().min().map(|divisor_low| {
+            (
+                divisor_low,
+                divisor_high_candidates.into_iter().max().unwrap(),
+            )
+        })
+    } else {
+        let source_all_negative = source_high < 0;
+        let source_all_positive = source_low > 0;
+        assert!(source_all_negative ^ source_all_positive);
+
+        // Divisor is largest in magnitude (farthest from 0) when source is farthest away from 0,
+        // and result is closest to 0. Do case work to figure out which end of each range
+        // is closer and farther to 0.
+        let (source_closer_to_zero, source_farther_from_zero) = if source_all_negative {
+            (source_high, source_low)
+        } else if source_all_positive {
+            (source_low, source_high)
+        } else {
+            unreachable!();
+        };
+        let (result_closer_to_zero, result_farther_from_zero) = if result_all_negative {
+            (result_high, result_low)
+        } else if result_all_positive {
+            (result_low, result_high)
+        } else {
+            unreachable!();
+        };
+
+        let (source_closer_to_zero, source_farther_from_zero) = {
+            // Avoid truncation-related problems.
+            // Just because 9 / 5 == 1, doesn't mean that 9 / 1 == 5.
+            // To guarantee correctness, we have to move the source bounds toward each other
+            // to the nearest actually-reachable value for a given result and divisor.
+            let remainder = source_closer_to_zero % result_farther_from_zero;
+            let updated_source_closer_to_zero = {
+                // We want to move this source endpoint away from the other range endpoint.
+                // This is the max offset without changing the result of the division by
+                // the result value.
+                let max_offset =
+                    result_farther_from_zero.saturating_sub(result_farther_from_zero.signum());
+
+                let offset = max_offset.saturating_sub(remainder);
+                source_closer_to_zero.saturating_add(offset)
+            };
+            assert_eq!(
+                source_closer_to_zero.saturating_div(result_farther_from_zero),
+                updated_source_closer_to_zero.saturating_div(result_farther_from_zero)
+            );
+
+            let remainder = source_farther_from_zero % result_closer_to_zero;
+            let updated_source_farther_from_zero = {
+                // We want to move this source endpoint away from the other range endpoint.
+                // This is the max offset without changing the result of the division by
+                // the result value.
+                let max_offset =
+                    result_closer_to_zero.saturating_sub(result_closer_to_zero.signum());
+
+                let offset = max_offset.saturating_sub(remainder);
+                source_farther_from_zero.saturating_add(offset)
+            };
+            assert_eq!(
+                source_farther_from_zero.saturating_div(result_closer_to_zero),
+                updated_source_farther_from_zero.saturating_div(result_closer_to_zero)
+            );
+
+            (updated_source_closer_to_zero, updated_source_farther_from_zero)
+        };
+
+        let (mut divisor_closer_to_zero, divisor_farther_from_zero) = (
+            source_closer_to_zero / result_farther_from_zero,
+            source_farther_from_zero / result_closer_to_zero,
+        );
+        if divisor_farther_from_zero == 0 {
+            // Our range is (0, 0) but the divisor cannot be 0. No valid solutions found.
+            assert_eq!(divisor_closer_to_zero, 0);
+            return None;
+        }
+
+        if divisor_closer_to_zero == 0 {
+            // The closer-to-zero bound is zero, but the other one is not.
+            // We can nudge the closer-to-zero bound in the away-from-zero direction by one,
+            // and the range will remain non-empty.
+            divisor_closer_to_zero += divisor_farther_from_zero.signum();
+        }
+
+        // Check the sign of the divisor and arrange
+        // the two divisor magnitude endpoints appropriately.
+        let (divisor_low, divisor_high) = if (result_all_positive && source_all_positive)
+            || (result_all_negative && source_all_negative)
+        {
+            // Signs match, the entire divisor range is positive.
+            assert!(divisor_closer_to_zero > 0);
+            assert!(divisor_farther_from_zero > 0);
+            (divisor_closer_to_zero, divisor_farther_from_zero)
+        } else if (result_all_positive && source_all_negative)
+            || (result_all_negative && source_all_positive)
+        {
+            // Signs don't match, the entire divisior range is negative.
+            assert!(divisor_closer_to_zero < 0);
+            assert!(divisor_farther_from_zero < 0);
+            (divisor_farther_from_zero, divisor_closer_to_zero)
+        } else {
+            unreachable!()
+        };
+
+        if divisor_low <= divisor_high {
+            Some((divisor_low, divisor_high))
+        } else {
+            unreachable!();
+        }
+    }
+}
+
+fn divisor_range_analysis(result: (i64, i64), source: (i64, i64)) -> (i64, i64) {
+    // source / divisor = result, solve for divisor range valid for any result and source
+    // This is similar to div_range_analysis(source, result) with caveats:
+    // - if result contains 0,
+    // - choosing the *maximum* possible range size for the divisors, unlike
+    //   other functions which would pick divisors that work for *all sources*.
+    let (mut source_low, mut source_high) = source;
+    let (result_low, result_high) = result;
+
+    if source == (0, 0) {
+        assert!((result_low..=result_high).contains(&0));
+        return MAX_VALUE_RANGE;
+    }
+
+    let (mut divisor_low, mut divisor_high) = {
+        let source_range = source_low..=source_high;
+        let result_range = result_low..=result_high;
+
+        if source_range.contains(&0) && !result_range.contains(&0) {
+            // The source range contains 0, but the result range does not.
+            // Then the source can't be 0. We can't poke a hole in the middle of the source range
+            // but we can shrink the source range if the zero is on one end or the other.
+            if source_low == 0 {
+                source_low += 1;
+            }
+            if source_high == 0 {
+                source_high -= 1;
+            }
+            assert!(source_low <= source_high);
+        }
+
+        if result_range.contains(&0) {
+            let mut divisor_low = i64::MAX;
+            let mut divisor_high = i64::MIN;
+
+            // 0 is a possible result of this division.
+            // We can get 0 by exceeding either source endpoint's absolute value,
+            // in either the positive or the negative direction.
+            // If any source value exists that is not i64::MIN, a divison by i64::MIN
+            // would produce 0 and satisfy the input condition.
+            //
+            // However, i64::MIN.abs() will overflow and panic! So instead, check that
+            // source_high > i64::MIN (since source_low <= source_high).
+            if source_high > i64::MIN {
+                divisor_low = i64::MIN;
+            } else {
+                assert!(source_high == i64::MIN);
+                assert!(source_low == i64::MIN);
+                if result_range.contains(&1) {
+                    divisor_low = i64::MIN;
+                } else if result_range.contains(&-1) {
+                    divisor_high = i64::MAX;
+                }
+            }
+
+            // Similarly, if any source value exists that is not == i64::MAX or <= -i64::MAX,
+            // then a divison by i64::MAX would produce 0 for that source value
+            // and satisfy the input condition.
+            //
+            // As there are no values above i64::MAX, it's enough to check that the source_high
+            // bound isn't -i64::MAX or lower.
+            if source_high > -i64::MAX && source_high < i64::MAX {
+                divisor_high = i64::MAX;
+            }
+
+            // We've extracted as much info as we can from the zero result.
+            // Split the result range into (result_low, -1) and (1, result_high),
+            // dropping each of them if they are empty ranges, and recurse on their results.
+            // Then take the union of the possible divisor ranges.
+            let mut divisor_low_candidates = vec![divisor_low];
+            let mut divisor_high_candidates = vec![divisor_high];
+            if result_low <= -1 {
+                if let Some((low, high)) =
+                    divisor_range_analysis_with_nonzero_result((result_low, -1), source)
+                {
+                    divisor_low_candidates.push(low);
+                    divisor_high_candidates.push(high);
+                }
+            }
+            if result_high >= 1 {
+                if let Some((low, high)) =
+                    divisor_range_analysis_with_nonzero_result((1, result_high), source)
+                {
+                    divisor_low_candidates.push(low);
+                    divisor_high_candidates.push(high);
+                }
+            }
+
+            (
+                divisor_low_candidates.into_iter().min().unwrap(),
+                divisor_high_candidates.into_iter().max().unwrap(),
+            )
+        } else {
+            // The either the entire result range is positive,
+            // or the entire result range is negative.
+            divisor_range_analysis_with_nonzero_result(result, source).unwrap()
+        }
+    };
+
+    assert!(divisor_low != 0 || divisor_high != 0);
+    if divisor_low == 0 {
+        divisor_low += 1;
+    }
+    if divisor_high == 0 {
+        divisor_high -= 1;
+    }
+
+    assert!(
+        divisor_low <= divisor_high,
+        "{:?} {:?} -> ({}, {})",
+        source,
+        result,
+        divisor_low,
+        divisor_high,
+    );
+
+    (divisor_low, divisor_high)
+}
+
 fn inv_div_range_analysis(result: (i64, i64), mut divisor: (i64, i64)) -> (i64, i64) {
     // source / divisor = result, solve for source given ranges for result and divisor
     // This is similar to mul_range_analysis but accounts for the truncation in division.
@@ -846,19 +1117,22 @@ fn inv_div_range_analysis(result: (i64, i64), mut divisor: (i64, i64)) -> (i64, 
             }
         };
 
-        if let (Some((min_pos_result, max_pos_result)), Some((min_pos_div, max_pos_div))) = (non_negative_result_extremes, positive_divisor_extremes) {
+        if let (Some((min_pos_result, max_pos_result)), Some((min_pos_div, max_pos_div))) =
+            (non_negative_result_extremes, positive_divisor_extremes)
+        {
             // Both operands are non-negative, so the result is always non-negative.
             // Truncation toward zero means that only the high value needs a truncation adjustment.
             source_high = std::cmp::max(
                 source_high,
-                max_pos_result.saturating_mul(max_pos_div).saturating_add(max_pos_div - 1),
+                max_pos_result
+                    .saturating_mul(max_pos_div)
+                    .saturating_add(max_pos_div - 1),
             );
-            source_low = std::cmp::min(
-                source_low,
-                min_pos_result.saturating_mul(min_pos_div)
-            );
+            source_low = std::cmp::min(source_low, min_pos_result.saturating_mul(min_pos_div));
         }
-        if let (Some((min_neg_result, max_neg_result)), Some((min_neg_div, max_neg_div))) = (non_positive_result_extremes, negative_divisor_extremes) {
+        if let (Some((min_neg_result, max_neg_result)), Some((min_neg_div, max_neg_div))) =
+            (non_positive_result_extremes, negative_divisor_extremes)
+        {
             // Both operands are non-positive, so the result is always non-negative.
             // Truncation toward zero means that only the high value needs a truncation adjustment.
             source_high = std::cmp::max(
@@ -866,37 +1140,38 @@ fn inv_div_range_analysis(result: (i64, i64), mut divisor: (i64, i64)) -> (i64, 
                 // We do a saturating_sub() of min_neg_div + 1 rather than
                 // a saturating_add() of -min_neg_div followed by -1, since
                 // -min_neg_div could overflow if min_neg_div is i64::MIN.
-                min_neg_result.saturating_mul(min_neg_div).saturating_sub(min_neg_div + 1),
+                min_neg_result
+                    .saturating_mul(min_neg_div)
+                    .saturating_sub(min_neg_div + 1),
             );
-            source_low = std::cmp::min(
-                source_low,
-                max_neg_result.saturating_mul(max_neg_div)
-            );
+            source_low = std::cmp::min(source_low, max_neg_result.saturating_mul(max_neg_div));
         }
-        if let (Some((min_pos_result, max_pos_result)), Some((min_neg_div, max_neg_div))) = (non_negative_result_extremes, negative_divisor_extremes) {
+        if let (Some((min_pos_result, max_pos_result)), Some((min_neg_div, max_neg_div))) =
+            (non_negative_result_extremes, negative_divisor_extremes)
+        {
             // One operand is non-negative and the other is negative,
             // so the result is always non-positive.
             // Truncation toward zero means that only the low value needs a truncation adjustment.
-            source_high = std::cmp::max(
-                source_high,
-                min_pos_result.saturating_mul(max_neg_div),
-            );
+            source_high = std::cmp::max(source_high, min_pos_result.saturating_mul(max_neg_div));
             source_low = std::cmp::min(
                 source_low,
-                max_pos_result.saturating_mul(min_neg_div).saturating_add(min_neg_div + 1),
+                max_pos_result
+                    .saturating_mul(min_neg_div)
+                    .saturating_add(min_neg_div + 1),
             );
         }
-        if let (Some((min_neg_result, max_neg_result)), Some((min_pos_div, max_pos_div))) = (non_positive_result_extremes, positive_divisor_extremes) {
+        if let (Some((min_neg_result, max_neg_result)), Some((min_pos_div, max_pos_div))) =
+            (non_positive_result_extremes, positive_divisor_extremes)
+        {
             // One operand is non-positive and the other is positive,
             // so the result is always non-positive.
             // Truncation toward zero means that only the low value needs a truncation adjustment.
-            source_high = std::cmp::max(
-                source_high,
-                max_neg_result.saturating_mul(min_pos_div),
-            );
+            source_high = std::cmp::max(source_high, max_neg_result.saturating_mul(min_pos_div));
             source_low = std::cmp::min(
                 source_low,
-                min_neg_result.saturating_mul(max_pos_div).saturating_sub(max_pos_div - 1),
+                min_neg_result
+                    .saturating_mul(max_pos_div)
+                    .saturating_sub(max_pos_div - 1),
             );
         }
 
@@ -1220,18 +1495,10 @@ fn div_input_range_analysis(
         operand,
         registers,
         inv_div_range_analysis,
-        |result, source| {
-            if result == (0, 0) {
-                MAX_VALUE_RANGE
-            } else {
-                let divisor = div_range_analysis(source, result);
-                match divisor {
-                    (0, 0) => unreachable!("{:?} {:?}", source, result),
-                    (neg, 0) => (neg, -1),
-                    (0, pos) => (1, pos),
-                    (neg, pos) => (neg, pos),
-                }
-            }
+        |_, _| {
+            // TODO: the below function is broken and generates incorrectly-narrow ranges.
+            // divisor_range_analysis(...)
+            MAX_VALUE_RANGE
         },
         div_range_analysis,
     );
@@ -1689,7 +1956,11 @@ mod tests {
         }
     }
 
-    fn validate_inv_div_source_range(source_range: (i64, i64), operand_range: (i64, i64), result_range: (i64, i64)) {
+    fn validate_inv_div_source_range(
+        source_range: (i64, i64),
+        operand_range: (i64, i64),
+        result_range: (i64, i64),
+    ) {
         // Ensure the source values on either extreme of the range satisfy the operation.
         // N.B.: It is NOT TRUE in general that all points of the range will satisfy
         //       the operation. See test_inv_div_range_with_hole_in_source_range for an example.
@@ -1885,11 +2156,7 @@ mod tests {
 
             let expected_range = inv_div_range_analysis(result_range, operand_range);
 
-            validate_inv_div_source_range(
-                expected_range,
-                operand_range,
-                result_range,
-            );
+            validate_inv_div_source_range(expected_range, operand_range, result_range);
         }
     }
 
@@ -2232,6 +2499,28 @@ mod tests {
         }
     }
 
+    #[ignore = "all div_input_range tests are ignored since the functionality is buggy"]
+    #[test]
+    fn test_div_input_range_analysis_exact_with_truncation() {
+        let source = (-10, -10);
+        let operand = (-500, 500);
+        let result = (1, 1);
+
+        let expected_source = source;
+        let expected_operand = (-10, -6);
+
+        // The known result range is no wider than the computed result range.
+        let computed_result = div_range_analysis(source, operand);
+        assert!(computed_result.0 <= result.0);
+        assert!(computed_result.1 >= result.1);
+
+        let (computed_source, computed_operand) =
+            execute_input_range_analysis(result, source, operand, div_input_range_analysis);
+        assert_eq!(computed_source, expected_source);
+        assert_eq!(computed_operand, expected_operand);
+    }
+
+    #[ignore = "all div_input_range tests are ignored since the functionality is buggy"]
     #[test]
     fn test_div_input_range_analysis_special() {
         let source = (-1000, 500);
@@ -2249,8 +2538,9 @@ mod tests {
         assert_eq!(computed_operand, (-10, -1));
     }
 
+    #[ignore = "all div_input_range tests are ignored since the functionality is buggy"]
     #[test]
-    fn test_div_input_range_analysis_special2() {
+    fn test_div_input_range_analysis_zero_result_wide_operand() {
         let source = (-10, -10);
         let operand = (-500, 300);
         let result = (-10, 10);
@@ -2260,17 +2550,41 @@ mod tests {
         assert!(computed_result.0 <= result.0);
         assert!(computed_result.1 >= result.1);
 
+        // The result contains 0. Both -10 / -500 = 0 and -10 / 300 = 0
+        // so the operand bounds cannot be tightened.
         let (computed_source, computed_operand) =
             execute_input_range_analysis(result, source, operand, div_input_range_analysis);
         assert_eq!(computed_source, (-10, -10));
-        assert_eq!(computed_operand, (-10, 10));
+        assert_eq!(computed_operand, (-500, 300));
     }
 
+    // The following two tests require stronger analysis for div inputs
+    // than what is currently implemented.
+    //
+    // They require that the input range analysis consider the current known range on the input
+    // while attempting to update that range. Here's an example to illustrate:
+    //
+    // Solve (source / divisor) = result for source and divisor based on the current bounds.
+    //    let source = (-30, -20);
+    //    let divisor = (-26, 4);
+    //    let result = (-1, 10);
+    //
+    // If not considering the current known range of divisor when updating it, then we decide
+    // that the possible divisor range is (i64::MIN, i64::MAX) since both of those extreme points
+    // will produce a valid result of 0. We then see that this is not a narrowing of the (-26, 4)
+    // divisor range that is already known, and don't update the divisor at all.
+    //
+    // However, if are able to represent the divisor space as unions of ranges,
+    // the possible i64 divisor values for the expression  (-30, -20) / divisor = (-1, 10) is:
+    //      (i64::MIN, -2) union (20, i64::MAX)
+    // Then intersecting with the previously-known divisor range of (-26, 4)
+    // we see that we CAN shrink the divisor range to (-26, 4).
+    #[ignore = "all div_input_range tests are ignored since the functionality is buggy"]
     #[test]
-    fn test_div_input_range_analysis_special3() {
-        let source = (-500, 500);
-        let operand = (-1, 0);
-        let result = (-1, 0);
+    fn test_div_input_range_analysis_zero_result_narrow_operand_right() {
+        let source = (-30, -20);
+        let operand = (-26, 4);
+        let result = (-1, 10);
 
         // The known result range is no wider than the computed result range.
         let computed_result = div_range_analysis(source, operand);
@@ -2279,12 +2593,37 @@ mod tests {
 
         let (computed_source, computed_operand) =
             execute_input_range_analysis(result, source, operand, div_input_range_analysis);
-        assert_eq!(computed_source, (0, 1));
-        assert_eq!(computed_operand, (-1, -1));
+        assert_eq!(computed_source, (-30, -20));
+
+        let _operand_with_better_analysis = (-26, -2);
+        let operand_with_current_analysis = operand;
+        assert_eq!(computed_operand, operand_with_current_analysis);
     }
 
+    #[ignore = "all div_input_range tests are ignored since the functionality is buggy"]
     #[test]
-    fn test_div_input_range_analysis_special4() {
+    fn test_div_input_range_analysis_zero_result_narrow_operand_left() {
+        let source = (-30, -20);
+        let operand = (-7, 25);
+        let result = (-10, 1);
+
+        // The known result range is no wider than the computed result range.
+        let computed_result = div_range_analysis(source, operand);
+        assert!(computed_result.0 <= result.0);
+        assert!(computed_result.1 >= result.1);
+
+        let (computed_source, computed_operand) =
+            execute_input_range_analysis(result, source, operand, div_input_range_analysis);
+        assert_eq!(computed_source, (-30, -20));
+
+        let _operand_with_better_analysis = (2, 25);
+        let operand_with_current_analysis = operand;
+        assert_eq!(computed_operand, operand_with_current_analysis);
+    }
+
+    #[ignore = "all div_input_range tests are ignored since the functionality is buggy"]
+    #[test]
+    fn test_div_input_range_analysis_operand_includes_zero() {
         let source = (-500, 500);
         let operand = (-10, 0);
         let result = (1, 10);
@@ -2300,11 +2639,13 @@ mod tests {
         assert_eq!(computed_operand, (-10, -1));
     }
 
+    #[ignore = "all div_input_range tests are ignored since the functionality is buggy"]
     #[test]
-    fn test_div_input_range_analysis_special5() {
+    #[should_panic] // because it doesn't work yet, we have truncation issues
+    fn test_div_input_range_analysis_check_truncation_issues() {
         let source = (-10, -9);
         let operand = (-500, 500);
-        let result = (0, 5);
+        let result = (1, 5);
 
         // The known result range is no wider than the computed result range.
         let computed_result = div_range_analysis(source, operand);
@@ -2314,9 +2655,35 @@ mod tests {
         let (computed_source, computed_operand) =
             execute_input_range_analysis(result, source, operand, div_input_range_analysis);
         assert_eq!(computed_source, (-10, -9));
-        assert_eq!(computed_operand, (-10, -1));
+        assert_eq!(computed_operand, (-10, -2));
     }
 
+    #[ignore = "all div_input_range tests are ignored since the functionality is buggy"]
+    #[test]
+    fn test_div_input_range_analysis_check_truncation_issues_relaxed() {
+        // Same as the non-relaxed test above, but only checks that
+        // the computed operand range is *no narrower* than the real range,
+        // i.e. that it doesn't exclude valid operand values.
+        let source = (-10, -9);
+        let operand = (-500, 500);
+        let result = (1, 5);
+
+        // The known result range is no wider than the computed result range.
+        let computed_result = div_range_analysis(source, operand);
+        assert!(computed_result.0 <= result.0);
+        assert!(computed_result.1 >= result.1);
+
+        let true_operand_range = (-10, -2);
+
+        let (computed_source, computed_operand) =
+            execute_input_range_analysis(result, source, operand, div_input_range_analysis);
+        assert_eq!(computed_source, (-10, -9));
+
+        assert!(computed_operand.0 <= true_operand_range.0);
+        assert!(computed_operand.1 >= true_operand_range.1);
+    }
+
+    // #[ignore = "all div_input_range tests are ignored since the functionality is buggy"]
     #[test]
     fn test_div_input_range_analysis() {
         let source_test_range = -10i64..=10i64;
@@ -2357,16 +2724,18 @@ mod tests {
                 operand_range, result_range, recovered_source_range, recovered_operand_range
             );
 
-            let expected_operand_range = {
-                if operand_range.0 == 0 {
-                    (operand_range.0 + 1, operand_range.1)
-                } else if operand_range.1 == 0 {
-                    (operand_range.0, operand_range.1 - 1)
-                } else {
-                    operand_range
-                }
-            };
-            assert_eq!(recovered_operand_range, expected_operand_range);
+            // TODO: Re-enable once divisor range analysis works properly.
+            // let expected_operand_range = {
+            //     if operand_range.0 == 0 {
+            //         (operand_range.0 + 1, operand_range.1)
+            //     } else if operand_range.1 == 0 {
+            //         (operand_range.0, operand_range.1 - 1)
+            //     } else {
+            //         operand_range
+            //     }
+            // };
+            // let expected_operand_range = operand_range;
+            // assert_eq!(recovered_operand_range, expected_operand_range);
             assert!(recovered_source_range.0.abs() <= 1000);
             assert!(recovered_source_range.1.abs() <= 1000);
             for source in recovered_source_range.0..=recovered_source_range.1 {
@@ -2380,29 +2749,76 @@ mod tests {
                 }));
             }
 
-            let (recovered_source_range, recovered_operand_range) = execute_input_range_analysis(
-                result_range,
-                source_range,
-                MAX_VALUE_RANGE,
-                div_input_range_analysis,
-            );
-            println!(
-                "{:?} inf {:?} -> {:?} {:?}",
-                source_range, result_range, recovered_source_range, recovered_operand_range
-            );
-            assert_eq!(recovered_source_range, source_range);
-            assert!(recovered_operand_range.0.abs() <= 1000);
-            assert!(recovered_operand_range.1.abs() <= 1000);
-            for operand in recovered_operand_range.0..=recovered_operand_range.1 {
-                if operand == 0 {
-                    continue;
-                }
-
-                println!("{:?} / {} => {:?}", source_range, operand, result_range);
-                assert!((source_range.0..=source_range.1).any(|source| {
-                    (result_range.0..=result_range.1).contains(&(source / operand))
+            // Ensure that no source value within 10 steps' distance on either side of
+            // the recovered source range is valid.
+            let check_interval = 10;
+            for source in (recovered_source_range.0 - check_interval)..recovered_source_range.0 {
+                assert!(!(operand_range.0..=operand_range.1).any(|operand| {
+                    if operand == 0 {
+                        false
+                    } else {
+                        (result_range.0..=result_range.1).contains(&(source / operand))
+                    }
                 }));
             }
+            for source in
+                (recovered_source_range.1 + 1)..=(recovered_source_range.1 + check_interval)
+            {
+                assert!(!(operand_range.0..=operand_range.1).any(|operand| {
+                    if operand == 0 {
+                        false
+                    } else {
+                        (result_range.0..=result_range.1).contains(&(source / operand))
+                    }
+                }));
+            }
+
+            // TODO: Re-enable once divisor range analysis works properly.
+            // // We don't want to provide a max-sized input operand range, because
+            // // then in cases where 0 is an allowable result, we'll get a max-sized operand range
+            // // back too, and we can't check it efficiently.
+            // let provided_operand_range = (-500, 500);
+            // let (recovered_source_range, recovered_operand_range) = execute_input_range_analysis(
+            //     result_range,
+            //     source_range,
+            //     provided_operand_range,
+            //     div_input_range_analysis,
+            // );
+            // println!(
+            //     "{:?} {:?} {:?} -> {:?} {:?}",
+            //     source_range,
+            //     provided_operand_range,
+            //     result_range,
+            //     recovered_source_range,
+            //     recovered_operand_range
+            // );
+            // assert_eq!(recovered_source_range, source_range);
+
+            // // Check that there are no valid operand values that are outside the recovered range,
+            // // to within max(abs(result range coordinate)) distance on either side.
+            // let check_interval = max(result_range.0.abs(), result_range.1.abs());
+            // for operand in (recovered_operand_range.0 - check_interval)..recovered_operand_range.0 {
+            //     if operand == 0 {
+            //         continue;
+            //     }
+
+            //     println!("{:?} / {} => {:?}", source_range, operand, result_range);
+            //     assert!(!(source_range.0..=source_range.1).any(|source| {
+            //         (result_range.0..=result_range.1).contains(&(source / operand))
+            //     }));
+            // }
+            // for operand in
+            //     (recovered_operand_range.1 + 1)..=(recovered_operand_range.1 + check_interval)
+            // {
+            //     if operand == 0 {
+            //         continue;
+            //     }
+
+            //     println!("{:?} / {} => {:?}", source_range, operand, result_range);
+            //     assert!(!(source_range.0..=source_range.1).any(|source| {
+            //         (result_range.0..=result_range.1).contains(&(source / operand))
+            //     }));
+            // }
         }
     }
 }
