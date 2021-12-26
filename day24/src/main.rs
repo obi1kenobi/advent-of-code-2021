@@ -746,8 +746,55 @@ fn mod_range_analysis(source: (i64, i64), operand: (i64, i64)) -> (i64, i64) {
     (result_low, result_high)
 }
 
+fn inv_mul_range_analysis(result: (i64, i64), multiplier: (i64, i64)) -> (i64, i64) {
+    // source * multiplier = result, solve for source given ranges for result and multiplier
+    // This is similar to div_range_analysis but accounts for the truncation in division.
+    let (result_low, result_high) = result;
+    let (multiplier_low, multiplier_high) = multiplier;
+
+    let result_interval = result_low..=result_high;
+
+    // Ensure valid values are available in the range.
+    assert!(result_high >= result_low);
+    assert!(multiplier_high >= multiplier_low);
+
+    // If the multiplier range is exactly 0 but the result can't be zero,
+    // something has gone horribly wrong.
+    if multiplier == (0, 0) {
+        // The result interval must be (0, 0), and the source can be any number.
+        assert!(result_interval.contains(&0));
+        return MAX_VALUE_RANGE;
+    }
+
+    let (mut source_low, mut source_high) = div_range_analysis(result, multiplier);
+
+    // Try shrinking the range by 1 from the bottom and top, to account for truncation.
+    if !result_interval.contains(&(source_low * multiplier_low))
+        && !result_interval.contains(&(source_low * multiplier_high))
+    {
+        source_low += 1;
+    }
+    if !result_interval.contains(&(source_high * multiplier_low))
+        && !result_interval.contains(&(source_high * multiplier_high))
+    {
+        source_high -= 1;
+    }
+
+    assert!(
+        result_interval.contains(&(source_low * multiplier_low))
+            || result_interval.contains(&(source_low * multiplier_high))
+    );
+    assert!(
+        result_interval.contains(&(source_high * multiplier_low))
+            || result_interval.contains(&(source_high * multiplier_high))
+    );
+
+    (source_low, source_high)
+}
+
 fn inv_div_range_analysis(result: (i64, i64), mut divisor: (i64, i64)) -> (i64, i64) {
     // source / divisor = result, solve for source given ranges for result and divisor
+    // This is similar to mul_range_analysis but accounts for the truncation in division.
     let (result_low, result_high) = result;
     let (mut divisor_low, mut divisor_high) = divisor;
 
@@ -770,35 +817,90 @@ fn inv_div_range_analysis(result: (i64, i64), mut divisor: (i64, i64)) -> (i64, 
     }
 
     let (source_low, source_high) = {
-        // Calculate the truncated value range to be added to the multipled source value.
-        let (truncated_low, truncated_high) = if (divisor_low >= 0 && result_low >= 0)
-            || (divisor_high <= 0 && result_high <= 0)
-        {
-            // The result and divisor ranges both lie fully on the same side of 0.
-            (0, std::cmp::max(0, divisor_high - 1))
-        } else if (divisor_high <= 0 && result_low >= 0) || (divisor_low >= 0 && result_high <= 0) {
-            // The result and divisor ranges lie fully on opposite sides of 0.
-            (std::cmp::min(divisor_low + 1, 0), 0)
-        } else {
-            // At least one of the ranges lies on both sides of 0,
-            // so the truncation could happen on either side of 0.
-            (divisor_low + 1, divisor_high - 1)
+        let mut source_high = i64::MIN;
+        let mut source_low = i64::MAX;
+
+        let (non_positive_result_extremes, non_negative_result_extremes) = {
+            if result_high < 0 {
+                // The entire range is negative. There are no non-negative values.
+                (Some((result_low, result_high)), None)
+            } else if result_low > 0 {
+                // The entire range is positive. There are no non-positive values.
+                (None, Some((result_low, result_high)))
+            } else {
+                // The range has both non-positive and non-negative values.
+                (Some((result_low, 0)), Some((0, result_high)))
+            }
+        };
+        let (negative_divisor_extremes, positive_divisor_extremes) = {
+            if divisor_high < 0 {
+                // The entire range is negative. There are no negative values.
+                (Some((divisor_low, divisor_high)), None)
+            } else if divisor_low > 0 {
+                // The entire range is positive. There are no positive values.
+                (None, Some((divisor_low, divisor_high)))
+            } else {
+                // The range has both positive and negative values.
+                // We don't consider 0 values since this is the divisor.
+                (Some((divisor_low, 1)), Some((1, divisor_high)))
+            }
         };
 
-        let (source_low, source_high) = mul_range_analysis(result, divisor);
+        if let (Some((min_pos_result, max_pos_result)), Some((min_pos_div, max_pos_div))) = (non_negative_result_extremes, positive_divisor_extremes) {
+            // Both operands are non-negative, so the result is always non-negative.
+            // Truncation toward zero means that only the high value needs a truncation adjustment.
+            source_high = std::cmp::max(
+                source_high,
+                max_pos_result.saturating_mul(max_pos_div).saturating_add(max_pos_div - 1),
+            );
+            source_low = std::cmp::min(
+                source_low,
+                min_pos_result.saturating_mul(min_pos_div)
+            );
+        }
+        if let (Some((min_neg_result, max_neg_result)), Some((min_neg_div, max_neg_div))) = (non_positive_result_extremes, negative_divisor_extremes) {
+            // Both operands are non-positive, so the result is always non-negative.
+            // Truncation toward zero means that only the high value needs a truncation adjustment.
+            source_high = std::cmp::max(
+                source_high,
+                // We do a saturating_sub() of min_neg_div + 1 rather than
+                // a saturating_add() of -min_neg_div followed by -1, since
+                // -min_neg_div could overflow if min_neg_div is i64::MIN.
+                min_neg_result.saturating_mul(min_neg_div).saturating_sub(min_neg_div + 1),
+            );
+            source_low = std::cmp::min(
+                source_low,
+                max_neg_result.saturating_mul(max_neg_div)
+            );
+        }
+        if let (Some((min_pos_result, max_pos_result)), Some((min_neg_div, max_neg_div))) = (non_negative_result_extremes, negative_divisor_extremes) {
+            // One operand is non-negative and the other is negative,
+            // so the result is always non-positive.
+            // Truncation toward zero means that only the low value needs a truncation adjustment.
+            source_high = std::cmp::max(
+                source_high,
+                min_pos_result.saturating_mul(max_neg_div),
+            );
+            source_low = std::cmp::min(
+                source_low,
+                max_pos_result.saturating_mul(min_neg_div).saturating_add(min_neg_div + 1),
+            );
+        }
+        if let (Some((min_neg_result, max_neg_result)), Some((min_pos_div, max_pos_div))) = (non_positive_result_extremes, positive_divisor_extremes) {
+            // One operand is non-positive and the other is positive,
+            // so the result is always non-positive.
+            // Truncation toward zero means that only the low value needs a truncation adjustment.
+            source_high = std::cmp::max(
+                source_high,
+                max_neg_result.saturating_mul(min_pos_div),
+            );
+            source_low = std::cmp::min(
+                source_low,
+                min_neg_result.saturating_mul(max_pos_div).saturating_sub(max_pos_div - 1),
+            );
+        }
 
-        println!(
-            "{:?} {:?} --> {:?} {:?}",
-            result,
-            divisor,
-            (source_low, source_high),
-            (truncated_low, truncated_high)
-        );
-
-        (
-            source_low.saturating_add(truncated_low),
-            source_high.saturating_add(truncated_high),
-        )
+        (source_low, source_high)
     };
 
     assert!(
@@ -928,6 +1030,7 @@ fn perform_input_range_analysis(
     registers: &[RegisterState; 4],
     source_range_func: fn((i64, i64), (i64, i64)) -> (i64, i64),
     operand_range_func: fn((i64, i64), (i64, i64)) -> (i64, i64),
+    result_range_func: fn((i64, i64), (i64, i64)) -> (i64, i64),
 ) {
     // It's maybe possible that updating range data for one input may allow
     // the other input's range to also be narrowed. Allow each input's range
@@ -938,6 +1041,11 @@ fn perform_input_range_analysis(
         source_value,
         source_range_func(result_range, operand_value_range),
     );
+    let result_range = intersect_value_ranges(
+        result_range,
+        result_range_func(source_value_range, operand_value_range),
+    )
+    .unwrap();
     let operand_value_range = update_range_data_if_register(
         input_ranges,
         value_ranges,
@@ -945,6 +1053,11 @@ fn perform_input_range_analysis(
         registers,
         operand_range_func(result_range, source_value_range),
     );
+    let result_range = intersect_value_ranges(
+        result_range,
+        result_range_func(source_value_range, operand_value_range),
+    )
+    .unwrap();
     update_range_data(
         input_ranges,
         value_ranges,
@@ -974,53 +1087,91 @@ fn add_input_range_analysis(
         registers,
         sub_range_analysis,
         sub_range_analysis,
+        add_range_analysis,
     )
 }
 
-#[allow(clippy::too_many_arguments)]
-fn mul_input_range_analysis(
+fn mul_input_range_analysis_for_zero_result(
     input_ranges: &mut BTreeMap<usize, (i64, i64)>,
     value_ranges: &mut BTreeMap<usize, (i64, i64)>,
-    result_range: (i64, i64),
     source_value_range: (i64, i64),
     operand_value_range: (i64, i64),
     source_value: RegisterState,
     operand: Operand,
     registers: &[RegisterState; 4],
 ) {
-    if result_range == (0, 0) {
-        // This is a special case, since we don't want
-        // to divide by zero in the range analysis.
-        //
-        // Approach:
-        // - If exactly one of the two mul input ranges contains 0,
-        //   that range must be exactly (0, 0).
-        // - If both mul input ranges contain 0, then we have no information.
-        //   We know that at least one of the inputs is always 0,
-        //   but we can't know which one -- and it's possible that both inputs
-        //   are zero sometimes. We simply have no way to tell.
-        // - If neither input range contains 0, we either have found UB
-        //   or a bug in the analysis.
-        let source_range = source_value_range.0..=source_value_range.1;
-        let operand_range = operand_value_range.0..=operand_value_range.1;
-        match (source_range.contains(&0), operand_range.contains(&0)) {
-            (true, false) => {
-                // The source range must be (0, 0).
-                update_range_data(input_ranges, value_ranges, source_value, (0, 0));
-            }
-            (false, true) => {
-                // The operand range must be (0, 0).
-                update_range_data_if_register(
-                    input_ranges,
-                    value_ranges,
-                    operand,
-                    registers,
-                    (0, 0),
-                );
-            }
-            (true, true) => {} // No information, see comment above.
-            (false, false) => unreachable!(),
+    // This is a special case, since we don't want
+    // to divide by zero in the range analysis.
+    //
+    // Approach:
+    // - If exactly one of the two mul input ranges contains 0,
+    //   that range must be exactly (0, 0).
+    // - If both mul input ranges contain 0, then we have no information.
+    //   We know that at least one of the inputs is always 0,
+    //   but we can't know which one -- and it's possible that both inputs
+    //   are zero sometimes. We simply have no way to tell.
+    // - If neither input range contains 0, we either have found UB
+    //   or a bug in the analysis.
+    let source_range = source_value_range.0..=source_value_range.1;
+    let operand_range = operand_value_range.0..=operand_value_range.1;
+    match (source_range.contains(&0), operand_range.contains(&0)) {
+        (true, false) => {
+            // The source range must be (0, 0).
+            update_range_data(input_ranges, value_ranges, source_value, (0, 0));
         }
+        (false, true) => {
+            // The operand range must be (0, 0).
+            update_range_data_if_register(input_ranges, value_ranges, operand, registers, (0, 0));
+        }
+        (true, true) => {} // No information, see comment above.
+        (false, false) => unreachable!(),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn mul_input_range_analysis(
+    input_ranges: &mut BTreeMap<usize, (i64, i64)>,
+    value_ranges: &mut BTreeMap<usize, (i64, i64)>,
+    mut result_range: (i64, i64),
+    source_value_range: (i64, i64),
+    operand_value_range: (i64, i64),
+    source_value: RegisterState,
+    operand: Operand,
+    registers: &[RegisterState; 4],
+) {
+    // Can we prove that the result is always zero?
+    if (result_range.0..=result_range.1).contains(&0) && result_range != (0, 0) {
+        let expected_source_range = inv_mul_range_analysis(result_range, operand_value_range);
+        let expected_operand_range = inv_mul_range_analysis(result_range, source_value_range);
+
+        // If either expected input range has no overlap with its corresponding actual input range,
+        // then the only possible solution is a zero result.
+        let (source_value_range, operand_value_range) = get_register_and_operand_ranges(
+            input_ranges,
+            value_ranges,
+            source_value,
+            operand,
+            registers,
+        );
+
+        if intersect_value_ranges(source_value_range, expected_source_range).is_none()
+            || intersect_value_ranges(operand_value_range, expected_operand_range).is_none()
+        {
+            // The only possible solution is for the multiplication to be a "multiply by zero."
+            result_range = (0, 0);
+        }
+    }
+
+    if result_range == (0, 0) {
+        mul_input_range_analysis_for_zero_result(
+            input_ranges,
+            value_ranges,
+            source_value_range,
+            operand_value_range,
+            source_value,
+            operand,
+            registers,
+        );
     } else {
         perform_input_range_analysis(
             input_ranges,
@@ -1034,20 +1185,20 @@ fn mul_input_range_analysis(
                 if operand == (0, 0) {
                     MAX_VALUE_RANGE
                 } else {
-                    div_range_analysis(result, operand)
+                    inv_mul_range_analysis(result, operand)
                 }
             },
             |result, source| {
                 if source == (0, 0) {
                     MAX_VALUE_RANGE
                 } else {
-                    div_range_analysis(result, source)
+                    inv_mul_range_analysis(result, source)
                 }
             },
+            mul_range_analysis,
         );
     }
 }
-
 
 #[allow(clippy::too_many_arguments)]
 fn div_input_range_analysis(
@@ -1076,6 +1227,7 @@ fn div_input_range_analysis(
                 div_range_analysis(source, result)
             }
         },
+        div_range_analysis,
     );
 }
 
@@ -1148,6 +1300,35 @@ fn equal_input_range_analysis(
     }
 }
 
+fn get_register_and_operand_ranges(
+    input_ranges: &BTreeMap<usize, (i64, i64)>,
+    value_ranges: &BTreeMap<usize, (i64, i64)>,
+    source_value: RegisterState,
+    operand: Operand,
+    registers: &[RegisterState; 4],
+) -> ((i64, i64), (i64, i64)) {
+    let source_value_range = match source_value {
+        RegisterState::Exact(n) => (n, n),
+        RegisterState::Input(n) => input_ranges[&n],
+        RegisterState::Unknown(n) => value_ranges[&n],
+        RegisterState::Undefined => unreachable!(),
+    };
+    let operand_value_range = match operand {
+        Operand::Literal(l) => (l, l),
+        Operand::Register(Register(reg)) => {
+            let register_value = registers[reg];
+            match register_value {
+                RegisterState::Exact(n) => (n, n),
+                RegisterState::Input(n) => input_ranges[&n],
+                RegisterState::Unknown(n) => value_ranges[&n],
+                RegisterState::Undefined => unreachable!(),
+            }
+        }
+    };
+
+    (source_value_range, operand_value_range)
+}
+
 #[allow(clippy::type_complexity)]
 fn backpropagate_range_analysis(
     value_definitions: &BTreeMap<usize, ([RegisterState; 4], &Instruction)>,
@@ -1176,24 +1357,13 @@ fn backpropagate_range_analysis(
         let source_value = registers[destination];
         let operand = instr.operand().unwrap();
 
-        let source_value_range = match source_value {
-            RegisterState::Exact(n) => (n, n),
-            RegisterState::Input(n) => input_ranges[&n],
-            RegisterState::Unknown(n) => value_ranges[&n],
-            RegisterState::Undefined => unreachable!(),
-        };
-        let operand_value_range = match operand {
-            Operand::Literal(l) => (l, l),
-            Operand::Register(Register(reg)) => {
-                let register_value = registers[reg];
-                match register_value {
-                    RegisterState::Exact(n) => (n, n),
-                    RegisterState::Input(n) => input_ranges[&n],
-                    RegisterState::Unknown(n) => value_ranges[&n],
-                    RegisterState::Undefined => unreachable!(),
-                }
-            }
-        };
+        let (source_value_range, operand_value_range) = get_register_and_operand_ranges(
+            &input_ranges,
+            &value_ranges,
+            source_value,
+            operand,
+            &registers,
+        );
 
         // Let's make sure there's something to learn here:
         // - If the value in the destination register before the operation was Input or Unknown,
@@ -1421,13 +1591,19 @@ fn solve_part2(data: &[Instruction]) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use std::{cmp::{max, min}, collections::BTreeMap};
+    use std::{
+        cmp::{max, min},
+        collections::BTreeMap,
+    };
 
     use itertools::Itertools;
 
     use crate::{
-        add_range_analysis, div_range_analysis, equal_range_analysis, inv_div_range_analysis,
-        mod_range_analysis, mul_range_analysis, sub_range_analysis, RegisterState, parser::{Operand, Register}, add_input_range_analysis, MAX_VALUE_RANGE, mul_input_range_analysis, div_input_range_analysis,
+        add_input_range_analysis, add_range_analysis, div_input_range_analysis, div_range_analysis,
+        equal_range_analysis, inv_div_range_analysis, mod_range_analysis, mul_input_range_analysis,
+        mul_range_analysis,
+        parser::{Operand, Register},
+        sub_range_analysis, RegisterState, MAX_VALUE_RANGE,
     };
 
     #[test]
@@ -1507,6 +1683,180 @@ mod tests {
         }
     }
 
+    fn validate_inv_div_source_range(source_range: (i64, i64), operand_range: (i64, i64), result_range: (i64, i64)) {
+        // Ensure the source values on either extreme of the range satisfy the operation.
+        // N.B.: It is NOT TRUE in general that all points of the range will satisfy
+        //       the operation. See test_inv_div_range_with_hole_in_source_range for an example.
+        for source in [source_range.0, source_range.1] {
+            assert!(
+                (operand_range.0..=operand_range.1).any(|operand| {
+                    if operand == 0 {
+                        false
+                    } else {
+                        let result = source / operand;
+                        (result_range.0..=result_range.1).contains(&result)
+                    }
+                }),
+                "{:?} / {:?} -> {:?} for source {}",
+                source_range,
+                operand_range,
+                result_range,
+                source
+            );
+        }
+
+        // Ensure that values outside the calculated range do not satisfy the operation.
+        for source in [
+            source_range.0 - 2,
+            source_range.0 - 1,
+            source_range.1 + 1,
+            source_range.1 + 2,
+        ] {
+            for operand in operand_range.0..=operand_range.1 {
+                if operand == 0 {
+                    continue;
+                }
+                let result = source / operand;
+                assert!(
+                    !(result_range.0..=result_range.1).contains(&result),
+                    "{:?} / {:?} -> {:?} for {} / {}",
+                    source_range,
+                    operand_range,
+                    result_range,
+                    source,
+                    operand,
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_inv_div_range_exact() {
+        let result = (-10, -10);
+        let operand = (-10, -10);
+
+        let expected_source = (100, 109);
+        validate_inv_div_source_range(expected_source, operand, result);
+
+        let source = inv_div_range_analysis(result, operand);
+
+        assert_eq!(source, expected_source);
+    }
+
+    #[test]
+    fn test_inv_div_range_exact_positive() {
+        let result = (10, 10);
+        let operand = (10, 10);
+
+        let expected_source = (100, 109);
+        validate_inv_div_source_range(expected_source, operand, result);
+
+        let source = inv_div_range_analysis(result, operand);
+
+        assert_eq!(source, expected_source);
+    }
+
+    #[test]
+    fn test_inv_div_range_with_hole_in_source_range() {
+        let result = (-10, -10);
+        let operand = (-10, -9);
+
+        // The expected source range is (90, 109).
+        // It's easy to see that both endpoints are valid sources:
+        //   90  /  -9 = -10
+        //   109 / -10 = -10
+        // However, it is NOT TRUE that every point in this range is a valid source.
+        // For example, consider 99:
+        //   99 /  -9  = -11
+        //   99 / -10  =  -9
+        // Since our range analysis cannot exclude points from the middle of ranges,
+        // the (90, 109) range is the correct answer here.
+        let expected_source = (90, 109);
+        validate_inv_div_source_range(expected_source, operand, result);
+
+        let source = inv_div_range_analysis(result, operand);
+
+        assert_eq!(source, expected_source);
+    }
+
+    #[test]
+    fn test_inv_div_range_operand_across_zero() {
+        let result = (-10, -10);
+        let operand = (-10, 5);
+
+        let expected_source = (-54, 109);
+        validate_inv_div_source_range(expected_source, operand, result);
+
+        let source = inv_div_range_analysis(result, operand);
+
+        assert_eq!(source, expected_source);
+    }
+
+    #[test]
+    fn test_inv_div_range_result_positive_operand_across_zero() {
+        let result = (10, 10);
+        let operand = (-10, 5);
+
+        let expected_source = (-109, 54);
+        validate_inv_div_source_range(expected_source, operand, result);
+
+        let source = inv_div_range_analysis(result, operand);
+
+        assert_eq!(source, expected_source);
+    }
+
+    #[test]
+    fn test_inv_div_range_result_across_zero_operand_positive() {
+        let result = (-10, 7);
+        let operand = (5, 10);
+
+        let expected_source = (-109, 79);
+        validate_inv_div_source_range(expected_source, operand, result);
+
+        let source = inv_div_range_analysis(result, operand);
+
+        assert_eq!(source, expected_source);
+    }
+
+    #[test]
+    fn test_inv_div_range_result_across_zero_operand_negative() {
+        let result = (-10, 7);
+        let operand = (-10, -5);
+
+        let expected_source = (-79, 109);
+        validate_inv_div_source_range(expected_source, operand, result);
+
+        let source = inv_div_range_analysis(result, operand);
+
+        assert_eq!(source, expected_source);
+    }
+
+    #[test]
+    fn test_inv_div_range_result_to_zero_operand_across_zero() {
+        let result = (-7, 0);
+        let operand = (-10, 5);
+
+        let expected_source = (-39, 79);
+        validate_inv_div_source_range(expected_source, operand, result);
+
+        let source = inv_div_range_analysis(result, operand);
+
+        assert_eq!(source, expected_source);
+    }
+
+    #[test]
+    fn test_inv_div_range_result_to_zero() {
+        let result = (-10, 0);
+        let operand = (-10, -5);
+
+        let expected_source = (-9, 109);
+        validate_inv_div_source_range(expected_source, operand, result);
+
+        let source = inv_div_range_analysis(result, operand);
+
+        assert_eq!(source, expected_source);
+    }
+
     #[test]
     fn test_inv_div_range_analysis() {
         let test_range = -10i64..=10i64;
@@ -1523,45 +1873,17 @@ mod tests {
                 max(operand_range.0, operand_range.1),
             );
 
+            if operand_range == (0, 0) {
+                continue;
+            }
+
             let expected_range = inv_div_range_analysis(result_range, operand_range);
-            let range = expected_range.0..=expected_range.1;
 
-            // Ensure all source values in the calculated range satisfy the operation.
-            for source in expected_range.0..=expected_range.1 {
-                for operand in operand_range.0..=operand_range.1 {
-                    let result = source / operand;
-                    assert!(
-                        (result_range.0..=result_range.1).contains(&result),
-                        "{:?} / {:?} -> {:?} for {} / {}",
-                        expected_range,
-                        operand_range,
-                        result_range,
-                        source,
-                        operand,
-                    );
-                }
-            }
-
-            // Ensure that values outside the calculated range do not satisfy the operation.
-            for source in [
-                expected_range.0 - 2,
-                expected_range.0 - 1,
-                expected_range.1 + 1,
-                expected_range.1 + 2,
-            ] {
-                for operand in operand_range.0..=operand_range.1 {
-                    let result = source / operand;
-                    assert!(
-                        !(result_range.0..=result_range.1).contains(&result),
-                        "{:?} / {:?} -> {:?} for {} / {}",
-                        range,
-                        operand_range,
-                        result_range,
-                        source,
-                        operand,
-                    );
-                }
-            }
+            validate_inv_div_source_range(
+                expected_range,
+                operand_range,
+                result_range,
+            );
         }
     }
 
@@ -1725,15 +2047,14 @@ mod tests {
             (i64, i64),
             RegisterState,
             Operand,
-            &[RegisterState; 4]
+            &[RegisterState; 4],
         ),
     ) -> ((i64, i64), (i64, i64)) {
         let mut input_ranges: BTreeMap<usize, (i64, i64)> = Default::default();
-        let mut value_ranges: BTreeMap<usize, (i64, i64)> = [
-            (0, source_range),
-            (1, operand_range),
-            (2, result_range),
-        ].into_iter().collect();
+        let mut value_ranges: BTreeMap<usize, (i64, i64)> =
+            [(0, source_range), (1, operand_range), (2, result_range)]
+                .into_iter()
+                .collect();
 
         input_range_func(
             &mut input_ranges,
@@ -1809,7 +2130,7 @@ mod tests {
     }
 
     #[test]
-    fn test_mul_input_range_analysis_special() {
+    fn test_mul_input_range_analysis_mul_by_zero() {
         let source = (23, 25);
         let operand = (0, 1);
         let result = (0, 5);
@@ -1819,14 +2140,27 @@ mod tests {
         assert!(computed_result.0 <= result.0);
         assert!(computed_result.1 >= result.1);
 
-        let (computed_source, computed_operand) = execute_input_range_analysis(
-            result,
-            source,
-            operand,
-            mul_input_range_analysis,
-        );
+        let (computed_source, computed_operand) =
+            execute_input_range_analysis(result, source, operand, mul_input_range_analysis);
         assert_eq!(computed_source, (23, 25));
         assert_eq!(computed_operand, (0, 0));
+    }
+
+    #[test]
+    fn test_mul_input_range_analysis_special() {
+        let source = (-500, 1000);
+        let operand = (-9, -8);
+        let result = (80, 90);
+
+        // The known result range is no wider than the computed result range.
+        let computed_result = mul_range_analysis(source, operand);
+        assert!(computed_result.0 <= result.0);
+        assert!(computed_result.1 >= result.1);
+
+        let (computed_source, computed_operand) =
+            execute_input_range_analysis(result, source, operand, mul_input_range_analysis);
+        assert_eq!(computed_source, (-11, -9));
+        assert_eq!(computed_operand, (-9, -8));
     }
 
     #[test]
@@ -1860,7 +2194,10 @@ mod tests {
                 operand_range,
                 mul_input_range_analysis,
             );
-            println!("inf {:?} {:?} -> {:?} {:?}", operand_range, result_range, recovered_source_range, recovered_operand_range);
+            println!(
+                "inf {:?} {:?} -> {:?} {:?}",
+                operand_range, result_range, recovered_source_range, recovered_operand_range
+            );
             assert_eq!(recovered_operand_range, operand_range);
             for source in recovered_source_range.0..=recovered_source_range.1 {
                 println!("{} * {:?} => {:?}", source, operand_range, result_range);
@@ -1875,7 +2212,10 @@ mod tests {
                 MAX_VALUE_RANGE,
                 mul_input_range_analysis,
             );
-            println!("{:?} inf {:?} -> {:?} {:?}", source_range, result_range, recovered_source_range, recovered_operand_range);
+            println!(
+                "{:?} inf {:?} -> {:?} {:?}",
+                source_range, result_range, recovered_source_range, recovered_operand_range
+            );
             assert_eq!(recovered_source_range, source_range);
             for operand in recovered_operand_range.0..=recovered_operand_range.1 {
                 println!("{:?} * {} => {:?}", source_range, operand, result_range);
@@ -1897,12 +2237,8 @@ mod tests {
         assert!(computed_result.0 <= result.0);
         assert!(computed_result.1 >= result.1);
 
-        let (computed_source, computed_operand) = execute_input_range_analysis(
-            result,
-            source,
-            operand,
-            div_input_range_analysis,
-        );
+        let (computed_source, computed_operand) =
+            execute_input_range_analysis(result, source, operand, div_input_range_analysis);
         assert_eq!(computed_source, (-109, -1));
         assert_eq!(computed_operand, (-10, 0));
     }
@@ -1918,12 +2254,8 @@ mod tests {
         assert!(computed_result.0 <= result.0);
         assert!(computed_result.1 >= result.1);
 
-        let (computed_source, computed_operand) = execute_input_range_analysis(
-            result,
-            source,
-            operand,
-            div_input_range_analysis,
-        );
+        let (computed_source, computed_operand) =
+            execute_input_range_analysis(result, source, operand, div_input_range_analysis);
         assert_eq!(computed_source, (-10, -10));
         assert_eq!(computed_operand, (-10, 10));
     }
@@ -1963,7 +2295,10 @@ mod tests {
                 operand_range,
                 div_input_range_analysis,
             );
-            println!("inf {:?} {:?} -> {:?} {:?}", operand_range, result_range, recovered_source_range, recovered_operand_range);
+            println!(
+                "inf {:?} {:?} -> {:?} {:?}",
+                operand_range, result_range, recovered_source_range, recovered_operand_range
+            );
             assert_eq!(recovered_operand_range, operand_range);
             assert!(recovered_source_range.0.abs() <= 1000);
             assert!(recovered_source_range.1.abs() <= 1000);
@@ -1984,18 +2319,21 @@ mod tests {
                 MAX_VALUE_RANGE,
                 div_input_range_analysis,
             );
-            println!("{:?} inf {:?} -> {:?} {:?}", source_range, result_range, recovered_source_range, recovered_operand_range);
+            println!(
+                "{:?} inf {:?} -> {:?} {:?}",
+                source_range, result_range, recovered_source_range, recovered_operand_range
+            );
             assert_eq!(recovered_source_range, source_range);
             assert!(recovered_operand_range.0.abs() <= 1000);
             assert!(recovered_operand_range.1.abs() <= 1000);
             for operand in recovered_operand_range.0..=recovered_operand_range.1 {
+                if operand == 0 {
+                    continue;
+                }
+
                 println!("{:?} / {} => {:?}", source_range, operand, result_range);
                 assert!((source_range.0..=source_range.1).any(|source| {
-                    if operand == 0 {
-                        false
-                    } else {
-                        (result_range.0..=result_range.1).contains(&(source / operand))
-                    }
+                    (result_range.0..=result_range.1).contains(&(source / operand))
                 }));
             }
         }
