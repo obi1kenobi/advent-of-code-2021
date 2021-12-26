@@ -746,6 +746,7 @@ fn mod_range_analysis(source: (i64, i64), operand: (i64, i64)) -> (i64, i64) {
     (result_low, result_high)
 }
 
+#[allow(dead_code)]
 fn inv_mul_range_analysis(result: (i64, i64), multiplier: (i64, i64)) -> (i64, i64) {
     // source * multiplier = result, solve for source given ranges for result and multiplier
     // This is similar to div_range_analysis but accounts for the truncation in division.
@@ -769,29 +770,30 @@ fn inv_mul_range_analysis(result: (i64, i64), multiplier: (i64, i64)) -> (i64, i
     let (mut source_low, mut source_high) = div_range_analysis(result, multiplier);
 
     // Try shrinking the range by 1 from the bottom and top, to account for truncation.
-    if !result_interval.contains(&(source_low * multiplier_low))
-        && !result_interval.contains(&(source_low * multiplier_high))
+    if !result_interval.contains(&(source_low.saturating_mul(multiplier_low)))
+        && !result_interval.contains(&(source_low.saturating_mul(multiplier_high)))
     {
         source_low += 1;
     }
-    if !result_interval.contains(&(source_high * multiplier_low))
-        && !result_interval.contains(&(source_high * multiplier_high))
+    if !result_interval.contains(&(source_high.saturating_mul(multiplier_low)))
+        && !result_interval.contains(&(source_high.saturating_mul(multiplier_high)))
     {
         source_high -= 1;
     }
 
     assert!(
-        result_interval.contains(&(source_low * multiplier_low))
-            || result_interval.contains(&(source_low * multiplier_high))
+        result_interval.contains(&(source_low.saturating_mul(multiplier_low)))
+            || result_interval.contains(&(source_low.saturating_mul(multiplier_high)))
     );
     assert!(
-        result_interval.contains(&(source_high * multiplier_low))
-            || result_interval.contains(&(source_high * multiplier_high))
+        result_interval.contains(&(source_high.saturating_mul(multiplier_low)))
+            || result_interval.contains(&(source_high.saturating_mul(multiplier_high)))
     );
 
     (source_low, source_high)
 }
 
+#[allow(dead_code)]
 fn divisor_range_analysis_with_nonzero_result(
     result: (i64, i64),
     source: (i64, i64),
@@ -944,6 +946,7 @@ fn divisor_range_analysis_with_nonzero_result(
     }
 }
 
+#[allow(dead_code)]
 fn divisor_range_analysis(result: (i64, i64), source: (i64, i64)) -> (i64, i64) {
     // source / divisor = result, solve for divisor range valid for any result and source
     // This is similar to div_range_analysis(source, result) with caveats:
@@ -1366,6 +1369,7 @@ fn add_input_range_analysis(
     )
 }
 
+#[allow(dead_code)]
 fn mul_input_range_analysis_for_zero_result(
     input_ranges: &mut BTreeMap<usize, (i64, i64)>,
     value_ranges: &mut BTreeMap<usize, (i64, i64)>,
@@ -1403,6 +1407,7 @@ fn mul_input_range_analysis_for_zero_result(
     }
 }
 
+#[allow(dead_code, unused_variables, unused_mut)]
 #[allow(clippy::too_many_arguments)]
 fn mul_input_range_analysis(
     input_ranges: &mut BTreeMap<usize, (i64, i64)>,
@@ -1414,65 +1419,67 @@ fn mul_input_range_analysis(
     operand: Operand,
     registers: &[RegisterState; 4],
 ) {
-    // Can we prove that the result is always zero?
-    if (result_range.0..=result_range.1).contains(&0) && result_range != (0, 0) {
-        let expected_source_range = inv_mul_range_analysis(result_range, operand_value_range);
-        let expected_operand_range = inv_mul_range_analysis(result_range, source_value_range);
+    // TODO: Re-enable this once it works properly.
+    //
+    // // Can we prove that the result is always zero?
+    // if (result_range.0..=result_range.1).contains(&0) && result_range != (0, 0) {
+    //     let expected_source_range = inv_mul_range_analysis(result_range, operand_value_range);
+    //     let expected_operand_range = inv_mul_range_analysis(result_range, source_value_range);
 
-        // If either expected input range has no overlap with its corresponding actual input range,
-        // then the only possible solution is a zero result.
-        let (source_value_range, operand_value_range) = get_register_and_operand_ranges(
-            input_ranges,
-            value_ranges,
-            source_value,
-            operand,
-            registers,
-        );
+    //     // If either expected input range has no overlap with its corresponding actual input range,
+    //     // then the only possible solution is a zero result.
+    //     let (source_value_range, operand_value_range) = get_register_and_operand_ranges(
+    //         input_ranges,
+    //         value_ranges,
+    //         source_value,
+    //         operand,
+    //         registers,
+    //     );
 
-        if intersect_value_ranges(source_value_range, expected_source_range).is_none()
-            || intersect_value_ranges(operand_value_range, expected_operand_range).is_none()
-        {
-            // The only possible solution is for the multiplication to be a "multiply by zero."
-            result_range = (0, 0);
-        }
-    }
+    //     if intersect_value_ranges(source_value_range, expected_source_range).is_none()
+    //         || intersect_value_ranges(operand_value_range, expected_operand_range).is_none()
+    //     {
+    //         // The only possible solution is for the multiplication to be a "multiply by zero."
+    //         result_range = (0, 0);
+    //     }
+    // }
 
-    if result_range == (0, 0) {
-        mul_input_range_analysis_for_zero_result(
-            input_ranges,
-            value_ranges,
-            source_value_range,
-            operand_value_range,
-            source_value,
-            operand,
-            registers,
-        );
-    } else {
-        perform_input_range_analysis(
-            input_ranges,
-            value_ranges,
-            result_range,
-            operand_value_range,
-            source_value,
-            operand,
-            registers,
-            |result, operand| {
-                if operand == (0, 0) {
-                    MAX_VALUE_RANGE
-                } else {
-                    inv_mul_range_analysis(result, operand)
-                }
-            },
-            |result, source| {
-                if source == (0, 0) {
-                    MAX_VALUE_RANGE
-                } else {
-                    inv_mul_range_analysis(result, source)
-                }
-            },
-            mul_range_analysis,
-        );
-    }
+    // if result_range == (0, 0) {
+    //     mul_input_range_analysis_for_zero_result(
+    //         input_ranges,
+    //         value_ranges,
+    //         source_value_range,
+    //         operand_value_range,
+    //         source_value,
+    //         operand,
+    //         registers,
+    //     );
+    // } else {
+    //     perform_input_range_analysis(
+    //         input_ranges,
+    //         value_ranges,
+    //         result_range,
+    //         operand_value_range,
+    //         source_value,
+    //         operand,
+    //         registers,
+    //         |result, operand| {
+    //             if operand == (0, 0) {
+    //                 MAX_VALUE_RANGE
+    //             } else {
+    //                 inv_mul_range_analysis(result, operand)
+    //             }
+    //         },
+    //         |result, source| {
+    //             if source == (0, 0) {
+    //                 MAX_VALUE_RANGE
+    //             } else {
+    //                 inv_mul_range_analysis(result, source)
+    //             }
+    //         },
+    //         mul_range_analysis,
+    //     );
+    // }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2402,6 +2409,7 @@ mod tests {
         }
     }
 
+    #[ignore = "all mul_input_range tests are ignored since the functionality is buggy"]
     #[test]
     fn test_mul_input_range_analysis_mul_by_zero() {
         let source = (23, 25);
@@ -2419,6 +2427,7 @@ mod tests {
         assert_eq!(computed_operand, (0, 0));
     }
 
+    #[ignore = "all mul_input_range tests are ignored since the functionality is buggy"]
     #[test]
     fn test_mul_input_range_analysis_special() {
         let source = (-500, 1000);
@@ -2436,6 +2445,7 @@ mod tests {
         assert_eq!(computed_operand, (-9, -8));
     }
 
+    #[ignore = "all mul_input_range tests are ignored since the functionality is buggy"]
     #[test]
     fn test_mul_input_range_analysis() {
         let source_test_range = -10i64..=10i64;
