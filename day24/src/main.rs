@@ -1224,7 +1224,13 @@ fn div_input_range_analysis(
             if result == (0, 0) {
                 MAX_VALUE_RANGE
             } else {
-                div_range_analysis(source, result)
+                let divisor = div_range_analysis(source, result);
+                match divisor {
+                    (0, 0) => unreachable!("{:?} {:?}", source, result),
+                    (neg, 0) => (neg, -1),
+                    (0, pos) => (1, pos),
+                    (neg, pos) => (neg, pos),
+                }
             }
         },
         div_range_analysis,
@@ -2240,7 +2246,7 @@ mod tests {
         let (computed_source, computed_operand) =
             execute_input_range_analysis(result, source, operand, div_input_range_analysis);
         assert_eq!(computed_source, (-109, -1));
-        assert_eq!(computed_operand, (-10, 0));
+        assert_eq!(computed_operand, (-10, -1));
     }
 
     #[test]
@@ -2258,6 +2264,57 @@ mod tests {
             execute_input_range_analysis(result, source, operand, div_input_range_analysis);
         assert_eq!(computed_source, (-10, -10));
         assert_eq!(computed_operand, (-10, 10));
+    }
+
+    #[test]
+    fn test_div_input_range_analysis_special3() {
+        let source = (-500, 500);
+        let operand = (-1, 0);
+        let result = (-1, 0);
+
+        // The known result range is no wider than the computed result range.
+        let computed_result = div_range_analysis(source, operand);
+        assert!(computed_result.0 <= result.0);
+        assert!(computed_result.1 >= result.1);
+
+        let (computed_source, computed_operand) =
+            execute_input_range_analysis(result, source, operand, div_input_range_analysis);
+        assert_eq!(computed_source, (0, 1));
+        assert_eq!(computed_operand, (-1, -1));
+    }
+
+    #[test]
+    fn test_div_input_range_analysis_special4() {
+        let source = (-500, 500);
+        let operand = (-10, 0);
+        let result = (1, 10);
+
+        // The known result range is no wider than the computed result range.
+        let computed_result = div_range_analysis(source, operand);
+        assert!(computed_result.0 <= result.0);
+        assert!(computed_result.1 >= result.1);
+
+        let (computed_source, computed_operand) =
+            execute_input_range_analysis(result, source, operand, div_input_range_analysis);
+        assert_eq!(computed_source, (-109, -1));
+        assert_eq!(computed_operand, (-10, -1));
+    }
+
+    #[test]
+    fn test_div_input_range_analysis_special5() {
+        let source = (-10, -9);
+        let operand = (-500, 500);
+        let result = (0, 5);
+
+        // The known result range is no wider than the computed result range.
+        let computed_result = div_range_analysis(source, operand);
+        assert!(computed_result.0 <= result.0);
+        assert!(computed_result.1 >= result.1);
+
+        let (computed_source, computed_operand) =
+            execute_input_range_analysis(result, source, operand, div_input_range_analysis);
+        assert_eq!(computed_source, (-10, -9));
+        assert_eq!(computed_operand, (-10, -1));
     }
 
     #[test]
@@ -2299,7 +2356,17 @@ mod tests {
                 "inf {:?} {:?} -> {:?} {:?}",
                 operand_range, result_range, recovered_source_range, recovered_operand_range
             );
-            assert_eq!(recovered_operand_range, operand_range);
+
+            let expected_operand_range = {
+                if operand_range.0 == 0 {
+                    (operand_range.0 + 1, operand_range.1)
+                } else if operand_range.1 == 0 {
+                    (operand_range.0, operand_range.1 - 1)
+                } else {
+                    operand_range
+                }
+            };
+            assert_eq!(recovered_operand_range, expected_operand_range);
             assert!(recovered_source_range.0.abs() <= 1000);
             assert!(recovered_source_range.1.abs() <= 1000);
             for source in recovered_source_range.0..=recovered_source_range.1 {
