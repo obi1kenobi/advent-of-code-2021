@@ -1,6 +1,7 @@
 #![feature(map_try_insert)]
 
 use std::{
+    cmp::Ordering,
     collections::{btree_map::Entry, BTreeMap, BTreeSet},
     env, fs,
 };
@@ -197,7 +198,7 @@ fn process<'a>(start: Simulation<'a>) -> Box<dyn Iterator<Item = Simulation<'a>>
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum ProgramValue {
     Exact(i64),
     Input(usize),
@@ -410,6 +411,7 @@ fn perform_constant_propagation_and_value_numbering(
 
 fn find_input_and_value_dependencies_recursively(
     value_definitions: &BTreeMap<usize, ([ProgramValue; 4], &Instruction)>,
+    value_equivalences: &mut BTreeMap<ProgramValue, ProgramValue>,
     target_unknown_value: usize,
     input_dependencies: &mut BTreeSet<usize>,
     value_dependencies: &mut BTreeSet<usize>,
@@ -436,7 +438,7 @@ fn find_input_and_value_dependencies_recursively(
             ];
 
             for state in states.into_iter().flatten() {
-                match state {
+                match get_equivalent_value(value_equivalences, state) {
                     ProgramValue::Exact(_) => {}
                     ProgramValue::Input(n) => {
                         input_dependencies.insert(n);
@@ -448,6 +450,7 @@ fn find_input_and_value_dependencies_recursively(
                             // dependencies to be discovered.
                             find_input_and_value_dependencies_recursively(
                                 value_definitions,
+                                value_equivalences,
                                 n,
                                 input_dependencies,
                                 value_dependencies,
@@ -463,6 +466,7 @@ fn find_input_and_value_dependencies_recursively(
 
 fn find_input_and_value_dependencies(
     value_definitions: &BTreeMap<usize, ([ProgramValue; 4], &Instruction)>,
+    value_equivalences: &mut BTreeMap<ProgramValue, ProgramValue>,
     target_unknown_value: usize,
 ) -> (BTreeSet<usize>, BTreeSet<usize>) {
     let mut input_dependencies = BTreeSet::new();
@@ -470,6 +474,7 @@ fn find_input_and_value_dependencies(
 
     find_input_and_value_dependencies_recursively(
         value_definitions,
+        value_equivalences,
         target_unknown_value,
         &mut input_dependencies,
         &mut value_dependencies,
@@ -898,7 +903,10 @@ fn divisor_range_analysis_with_nonzero_result(
                 updated_source_farther_from_zero.saturating_div(result_closer_to_zero)
             );
 
-            (updated_source_closer_to_zero, updated_source_farther_from_zero)
+            (
+                updated_source_closer_to_zero,
+                updated_source_farther_from_zero,
+            )
         };
 
         let (mut divisor_closer_to_zero, divisor_farther_from_zero) = (
@@ -1748,7 +1756,213 @@ fn backpropagate_range_analysis(
     (input_ranges, value_ranges)
 }
 
+fn record_equivalent_values(
+    equivalences: &mut BTreeMap<ProgramValue, ProgramValue>,
+    descendant: ProgramValue,
+    parent: ProgramValue,
+) {
+    // Maintain the equivalences map such that parent values are "more basic"
+    // and appear earlier in the program.
+    let (descendant, parent) = match parent.cmp(&descendant) {
+        Ordering::Less => (descendant, parent),
+        Ordering::Equal => unreachable!(),
+        Ordering::Greater => (parent, descendant),
+    };
+
+    let final_parent = get_equivalent_value(equivalences, parent);
+    if let Some(prior_parent) = equivalences.insert(descendant, final_parent) {
+        if get_equivalent_value(equivalences, prior_parent) != final_parent {
+            // Found an equivalence that merges two different equivalence trees!
+            record_equivalent_values(equivalences, prior_parent, final_parent);
+        }
+    }
+}
+
+fn get_equivalent_value(
+    equivalences: &mut BTreeMap<ProgramValue, ProgramValue>,
+    value: ProgramValue,
+) -> ProgramValue {
+    let mut fixups: Vec<ProgramValue> = vec![];
+    let mut result_ref = &value;
+    while let Some(parent) = equivalences.get(result_ref) {
+        fixups.push(*result_ref);
+        result_ref = parent;
+    }
+    let result = *result_ref;
+
+    // Flatten the tree to make future lookups faster.
+    for fixup in fixups.into_iter() {
+        equivalences.entry(fixup).and_modify(|v| *v = result);
+    }
+
+    result
+}
+
+fn find_equivalent_values(
+    value_definitions: &BTreeMap<usize, ([ProgramValue; 4], &Instruction)>,
+    input_ranges: &BTreeMap<usize, (i64, i64)>,
+    value_ranges: &BTreeMap<usize, (i64, i64)>,
+) -> BTreeMap<ProgramValue, ProgramValue> {
+    // TODO: Uncommenting this block kills the dead value elimination analysis,
+    //       because it replaces the final Z register's "Unknown" value with Exact(0)
+    //       so everything in the program appears dead.
+    //
+    // Initialize with all values for which range analysis has determined they have an exact value.
+    // This is important since the backpropagation range analysis can determine some things are
+    // constants even thought their parent operation and inputs wouldn't be able to determine
+    // that same information in the forward pass.
+    // let mut equivalences: BTreeMap<ProgramValue, ProgramValue> = value_definitions.keys().filter_map(
+    //     |value_number| {
+    //         if let Some(&(range_low, range_high)) = value_ranges.get(value_number) {
+    //             if range_low == range_high {
+    //                 return Some((ProgramValue::Unknown(*value_number), ProgramValue::Exact(range_low)))
+    //             }
+    //         }
+
+    //         None
+    //     }
+    // ).collect();
+    let mut equivalences = Default::default();
+
+    for (value_number, (registers, instr)) in value_definitions {
+        let current_value = ProgramValue::Unknown(*value_number);
+        let destination = instr.destination().0;
+        let source_value = get_equivalent_value(&mut equivalences, registers[destination]);
+        let operand = instr.operand().unwrap();
+        let operand_value = match operand {
+            Operand::Literal(l) => ProgramValue::Exact(l),
+            Operand::Register(Register(r)) => get_equivalent_value(&mut equivalences, registers[r]),
+        };
+
+        let (source_value_range, operand_value_range) = get_register_and_operand_ranges(
+            input_ranges,
+            value_ranges,
+            source_value,
+            operand,
+            registers,
+        );
+
+        let maybe_exact_source_value = if source_value_range.0 == source_value_range.1 {
+            Some(source_value_range.0)
+        } else {
+            None
+        };
+        let maybe_exact_operand_value = if operand_value_range.0 == operand_value_range.1 {
+            Some(operand_value_range.0)
+        } else {
+            None
+        };
+
+        let equivalent_parent_value = {
+            match instr {
+                Instruction::Add(_, _) => {
+                    match (maybe_exact_source_value, maybe_exact_operand_value) {
+                        (Some(a), Some(b)) => Some(ProgramValue::Exact(a + b)),
+                        (Some(0), _) => Some(operand_value),
+                        (_, Some(0)) => Some(source_value),
+                        _ => None,
+                    }
+                }
+                Instruction::Mul(_, _) => {
+                    match (maybe_exact_source_value, maybe_exact_operand_value) {
+                        (Some(a), Some(b)) => Some(ProgramValue::Exact(a * b)),
+                        (Some(0), _) | (_, Some(0)) => Some(ProgramValue::Exact(0)),
+                        (Some(1), _) => Some(operand_value),
+                        (_, Some(1)) => Some(source_value),
+                        _ => None,
+                    }
+                }
+                Instruction::Div(_, _) => {
+                    let exact_values = match (maybe_exact_source_value, maybe_exact_operand_value) {
+                        (Some(a), Some(b)) => Some(ProgramValue::Exact(a / b)),
+                        (Some(0), _) => Some(ProgramValue::Exact(0)),
+                        (_, Some(1)) => Some(source_value),
+                        _ => None,
+                    };
+                    exact_values.or_else(|| {
+                        if source_value == operand_value {
+                            // The two inputs represent the exact same value.
+                            Some(ProgramValue::Exact(1))
+                        } else {
+                            None
+                        }
+                    })
+                }
+                Instruction::Mod(_, _) => {
+                    let exact_values = match (maybe_exact_source_value, maybe_exact_operand_value) {
+                        (Some(a), Some(b)) => Some(ProgramValue::Exact(a % b)),
+                        (Some(0), _) | (_, Some(1)) => Some(ProgramValue::Exact(0)),
+                        _ => None,
+                    };
+                    exact_values.or_else(|| {
+                        if source_value == operand_value {
+                            // The two inputs represent the exact same value.
+                            Some(ProgramValue::Exact(0))
+                        } else {
+                            // Check range analysis to see if we can prove the mod is a no-op.
+                            // The mod is a no-op when the source value range lies entirely within
+                            // the range (0, operand_value_range.0 - 1).
+                            assert!(operand_value_range.0 >= 1);
+                            let no_op_range = 0..operand_value_range.0;
+                            if no_op_range.contains(&source_value_range.0) && no_op_range.contains(&source_value_range.1) {
+                                // No-op!
+                                Some(source_value)
+                            } else {
+                                None
+                            }
+                        }
+                    })
+                }
+                Instruction::Equal(_, _) => {
+                    if source_value == operand_value {
+                        // The two inputs represent the exact same value.
+                        Some(ProgramValue::Exact(1))
+                    } else {
+                        // Check range analysis to see if we can prove the inputs
+                        // are always non-equal to each other.
+                        let input_range_intersection = intersect_value_ranges(source_value_range, operand_value_range);
+                        if input_range_intersection.is_none() {
+                            // The two inputs have non-overlapping ranges. They can't be set
+                            // to the same value, so this equals operation is always false.
+                            Some(ProgramValue::Exact(0))
+                        } else {
+                            None
+                        }
+                    }
+                }
+                Instruction::Input(_) => unreachable!(),
+            }
+        };
+
+        if let Some(parent_value) = equivalent_parent_value {
+            record_equivalent_values(
+                &mut equivalences,
+                current_value,
+                parent_value,
+            );
+        }
+    }
+
+    equivalences
+}
+
 fn prune_no_ops(data: &[Instruction]) -> Vec<Instruction> {
+    // TODO: The broken mul backward range analysis means that we can't determine that
+    // certain values are known-constant. For example:
+    //     add y 1
+    //     [Input(13), Unknown(129), Unknown(133), Unknown(132)]
+    //     [Input(13), Unknown(129), Unknown(133), Unknown(132)]  <-veq
+    //     [(1, 9), (0, 1), (2, 10), (0, 0)]
+    //     [(1, 9), (0, 1), (2, 10), (0, 0)]  <-veq
+    //     mul y x
+    //     [Input(13), Unknown(129), Unknown(134), Unknown(132)]
+    //     [Input(13), Unknown(129), Unknown(134), Unknown(132)]  <-veq
+    //     [(1, 9), (0, 1), (0, 0), (0, 0)]
+    //     [(1, 9), (0, 1), (0, 0), (0, 0)]  <-veq
+    // In this situation, the "mul y x" with output (0, 0) where y had range (2, 10) means that
+    // the value of x = 0. That should have made Unknown(129) = Exact(0),
+    // which would then find further optimizations upstream.
+
     let known_z_value = 0i64;
     let known_z_value_range = (known_z_value, known_z_value);
 
@@ -1773,6 +1987,15 @@ fn prune_no_ops(data: &[Instruction]) -> Vec<Instruction> {
         known_z_value_range,
     );
 
+    let mut value_equivalences =
+        find_equivalent_values(&value_definitions, &input_ranges, &value_ranges);
+
+    println!("value equivalences:");
+    for (value, parent) in &value_equivalences {
+        println!("  {:?} -> {:?}", value, parent);
+    }
+    println!();
+
     let final_z_register = registers_after_instr.last().unwrap()[3];
     match final_z_register {
         ProgramValue::Undefined => unreachable!(),
@@ -1790,14 +2013,23 @@ fn prune_no_ops(data: &[Instruction]) -> Vec<Instruction> {
             // The final z register value is a numbered unknown value. Figure out what
             // inputs and unknown values influenced its value, and resume optimizing from there.
             let (input_dependencies, value_dependencies) =
-                find_input_and_value_dependencies(&value_definitions, target_unknown);
+                find_input_and_value_dependencies(&value_definitions, &mut value_equivalences, target_unknown);
 
             let mut result: Vec<Instruction> = vec![];
             let initial_state = [ProgramValue::Exact(0); 4];
             let mut state = initial_state;
             for (registers, instr) in registers_after_instr.iter().zip(data.iter()) {
                 println!("{}", instr);
-                println!("{:?}", *registers);
+                println!("{:?}", registers);
+
+                let equivalent_registers_vec = registers.iter().map(|val| get_equivalent_value(&mut value_equivalences, *val)).collect_vec();
+                let equivalent_registers = [
+                    equivalent_registers_vec[0],
+                    equivalent_registers_vec[1],
+                    equivalent_registers_vec[2],
+                    equivalent_registers_vec[3],
+                ];
+                println!("{:?}  <-veq", equivalent_registers);
 
                 let register_ranges = registers.map(|s| match s {
                     ProgramValue::Exact(x) => (x, x),
@@ -1807,6 +2039,14 @@ fn prune_no_ops(data: &[Instruction]) -> Vec<Instruction> {
                 });
                 println!("{:?}", register_ranges);
 
+                let equivalent_register_ranges = equivalent_registers.map(|s| match s {
+                    ProgramValue::Exact(x) => (x, x),
+                    ProgramValue::Input(inp) => input_ranges[&inp],
+                    ProgramValue::Unknown(unk) => value_ranges[&unk],
+                    ProgramValue::Undefined => unreachable!(),
+                });
+                println!("{:?}  <-veq", equivalent_register_ranges);
+
                 // An operation is known to be a no-op if the state of all registers after the operation
                 // is the same as before the instruction.
                 // - This is true even if the instruction was an input, since all input instructions produce
@@ -1814,11 +2054,11 @@ fn prune_no_ops(data: &[Instruction]) -> Vec<Instruction> {
                 // - This is true even if some of the non-destination registers are ProgramValue::Unknown,
                 //   since unknowns are numbered, and a given numbered ProgramValue::Unknown value
                 //   always represents the same value at all points in the program.
-                if state == *registers {
+                if state == equivalent_registers {
                     println!("  --> PRUNED");
                 } else {
                     result.push(instr.clone());
-                    state = *registers;
+                    state = equivalent_registers;
                 }
             }
 

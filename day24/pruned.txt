@@ -1,788 +1,1339 @@
+value equivalences:
+  Unknown(1) -> Unknown(0)
+  Unknown(3) -> Exact(0)
+  Unknown(4) -> Exact(1)
+  Unknown(5) -> Exact(25)
+  Unknown(6) -> Exact(26)
+  Unknown(9) -> Unknown(8)
+  Unknown(13) -> Exact(0)
+  Unknown(14) -> Exact(1)
+  Unknown(15) -> Exact(25)
+  Unknown(16) -> Exact(26)
+  Unknown(19) -> Unknown(18)
+  Unknown(34) -> Exact(0)
+  Unknown(35) -> Exact(1)
+  Unknown(36) -> Exact(25)
+  Unknown(37) -> Exact(26)
+  Unknown(40) -> Unknown(39)
+  Unknown(44) -> Exact(0)
+  Unknown(45) -> Exact(1)
+  Unknown(46) -> Exact(25)
+  Unknown(47) -> Exact(26)
+  Unknown(50) -> Unknown(49)
+  Unknown(76) -> Exact(0)
+  Unknown(77) -> Exact(1)
+  Unknown(78) -> Exact(25)
+  Unknown(79) -> Exact(26)
+  Unknown(82) -> Unknown(81)
+  Unknown(97) -> Exact(0)
+  Unknown(98) -> Exact(1)
+  Unknown(99) -> Exact(25)
+  Unknown(100) -> Exact(26)
+  Unknown(102) -> Input(10)
+  Unknown(135) -> Exact(0)
+
 inp w
 [Input(0), Exact(0), Exact(0), Exact(0)]
+[Input(0), Exact(0), Exact(0), Exact(0)]  <-veq
 [(1, 9), (0, 0), (0, 0), (0, 0)]
+[(1, 9), (0, 0), (0, 0), (0, 0)]  <-veq
 mul x 0
 [Input(0), Exact(0), Exact(0), Exact(0)]
+[Input(0), Exact(0), Exact(0), Exact(0)]  <-veq
 [(1, 9), (0, 0), (0, 0), (0, 0)]
+[(1, 9), (0, 0), (0, 0), (0, 0)]  <-veq
   --> PRUNED
 add x z
 [Input(0), Exact(0), Exact(0), Exact(0)]
+[Input(0), Exact(0), Exact(0), Exact(0)]  <-veq
 [(1, 9), (0, 0), (0, 0), (0, 0)]
+[(1, 9), (0, 0), (0, 0), (0, 0)]  <-veq
   --> PRUNED
 mod x 26
 [Input(0), Exact(0), Exact(0), Exact(0)]
+[Input(0), Exact(0), Exact(0), Exact(0)]  <-veq
 [(1, 9), (0, 0), (0, 0), (0, 0)]
+[(1, 9), (0, 0), (0, 0), (0, 0)]  <-veq
   --> PRUNED
 div z 1
 [Input(0), Exact(0), Exact(0), Exact(0)]
+[Input(0), Exact(0), Exact(0), Exact(0)]  <-veq
 [(1, 9), (0, 0), (0, 0), (0, 0)]
+[(1, 9), (0, 0), (0, 0), (0, 0)]  <-veq
   --> PRUNED
 add x 11
 [Input(0), Exact(11), Exact(0), Exact(0)]
+[Input(0), Exact(11), Exact(0), Exact(0)]  <-veq
 [(1, 9), (11, 11), (0, 0), (0, 0)]
+[(1, 9), (11, 11), (0, 0), (0, 0)]  <-veq
 eql x w
 [Input(0), Exact(0), Exact(0), Exact(0)]
+[Input(0), Exact(0), Exact(0), Exact(0)]  <-veq
 [(1, 9), (0, 0), (0, 0), (0, 0)]
+[(1, 9), (0, 0), (0, 0), (0, 0)]  <-veq
 eql x 0
 [Input(0), Exact(1), Exact(0), Exact(0)]
+[Input(0), Exact(1), Exact(0), Exact(0)]  <-veq
 [(1, 9), (1, 1), (0, 0), (0, 0)]
+[(1, 9), (1, 1), (0, 0), (0, 0)]  <-veq
 mul y 0
 [Input(0), Exact(1), Exact(0), Exact(0)]
+[Input(0), Exact(1), Exact(0), Exact(0)]  <-veq
 [(1, 9), (1, 1), (0, 0), (0, 0)]
+[(1, 9), (1, 1), (0, 0), (0, 0)]  <-veq
   --> PRUNED
 add y 25
 [Input(0), Exact(1), Exact(25), Exact(0)]
+[Input(0), Exact(1), Exact(25), Exact(0)]  <-veq
 [(1, 9), (1, 1), (25, 25), (0, 0)]
+[(1, 9), (1, 1), (25, 25), (0, 0)]  <-veq
 mul y x
 [Input(0), Exact(1), Exact(25), Exact(0)]
+[Input(0), Exact(1), Exact(25), Exact(0)]  <-veq
 [(1, 9), (1, 1), (25, 25), (0, 0)]
+[(1, 9), (1, 1), (25, 25), (0, 0)]  <-veq
   --> PRUNED
 add y 1
 [Input(0), Exact(1), Exact(26), Exact(0)]
+[Input(0), Exact(1), Exact(26), Exact(0)]  <-veq
 [(1, 9), (1, 1), (26, 26), (0, 0)]
+[(1, 9), (1, 1), (26, 26), (0, 0)]  <-veq
 mul z y
 [Input(0), Exact(1), Exact(26), Exact(0)]
+[Input(0), Exact(1), Exact(26), Exact(0)]  <-veq
 [(1, 9), (1, 1), (26, 26), (0, 0)]
+[(1, 9), (1, 1), (26, 26), (0, 0)]  <-veq
   --> PRUNED
 mul y 0
 [Input(0), Exact(1), Exact(0), Exact(0)]
+[Input(0), Exact(1), Exact(0), Exact(0)]  <-veq
 [(1, 9), (1, 1), (0, 0), (0, 0)]
+[(1, 9), (1, 1), (0, 0), (0, 0)]  <-veq
 add y w
 [Input(0), Exact(1), Input(0), Exact(0)]
+[Input(0), Exact(1), Input(0), Exact(0)]  <-veq
 [(1, 9), (1, 1), (1, 9), (0, 0)]
+[(1, 9), (1, 1), (1, 9), (0, 0)]  <-veq
 add y 3
 [Input(0), Exact(1), Unknown(0), Exact(0)]
+[Input(0), Exact(1), Unknown(0), Exact(0)]  <-veq
 [(1, 9), (1, 1), (4, 12), (0, 0)]
+[(1, 9), (1, 1), (4, 12), (0, 0)]  <-veq
 mul y x
 [Input(0), Exact(1), Unknown(0), Exact(0)]
+[Input(0), Exact(1), Unknown(0), Exact(0)]  <-veq
 [(1, 9), (1, 1), (4, 12), (0, 0)]
+[(1, 9), (1, 1), (4, 12), (0, 0)]  <-veq
   --> PRUNED
 add z y
 [Input(0), Exact(1), Unknown(0), Unknown(0)]
+[Input(0), Exact(1), Unknown(0), Unknown(0)]  <-veq
 [(1, 9), (1, 1), (4, 12), (4, 12)]
+[(1, 9), (1, 1), (4, 12), (4, 12)]  <-veq
 inp w
 [Input(1), Exact(1), Unknown(0), Unknown(0)]
+[Input(1), Exact(1), Unknown(0), Unknown(0)]  <-veq
 [(1, 9), (1, 1), (4, 12), (4, 12)]
+[(1, 9), (1, 1), (4, 12), (4, 12)]  <-veq
 mul x 0
 [Input(1), Exact(0), Unknown(0), Unknown(0)]
+[Input(1), Exact(0), Unknown(0), Unknown(0)]  <-veq
 [(1, 9), (0, 0), (4, 12), (4, 12)]
+[(1, 9), (0, 0), (4, 12), (4, 12)]  <-veq
 add x z
 [Input(1), Unknown(0), Unknown(0), Unknown(0)]
+[Input(1), Unknown(0), Unknown(0), Unknown(0)]  <-veq
 [(1, 9), (4, 12), (4, 12), (4, 12)]
+[(1, 9), (4, 12), (4, 12), (4, 12)]  <-veq
 mod x 26
 [Input(1), Unknown(1), Unknown(0), Unknown(0)]
+[Input(1), Unknown(0), Unknown(0), Unknown(0)]  <-veq
 [(1, 9), (4, 12), (4, 12), (4, 12)]
+[(1, 9), (4, 12), (4, 12), (4, 12)]  <-veq
+  --> PRUNED
 div z 1
 [Input(1), Unknown(1), Unknown(0), Unknown(0)]
+[Input(1), Unknown(0), Unknown(0), Unknown(0)]  <-veq
 [(1, 9), (4, 12), (4, 12), (4, 12)]
+[(1, 9), (4, 12), (4, 12), (4, 12)]  <-veq
   --> PRUNED
 add x 14
 [Input(1), Unknown(2), Unknown(0), Unknown(0)]
+[Input(1), Unknown(2), Unknown(0), Unknown(0)]  <-veq
 [(1, 9), (18, 26), (4, 12), (4, 12)]
+[(1, 9), (18, 26), (4, 12), (4, 12)]  <-veq
 eql x w
 [Input(1), Unknown(3), Unknown(0), Unknown(0)]
+[Input(1), Exact(0), Unknown(0), Unknown(0)]  <-veq
 [(1, 9), (0, 0), (4, 12), (4, 12)]
+[(1, 9), (0, 0), (4, 12), (4, 12)]  <-veq
 eql x 0
 [Input(1), Unknown(4), Unknown(0), Unknown(0)]
+[Input(1), Exact(1), Unknown(0), Unknown(0)]  <-veq
 [(1, 9), (1, 1), (4, 12), (4, 12)]
+[(1, 9), (1, 1), (4, 12), (4, 12)]  <-veq
 mul y 0
 [Input(1), Unknown(4), Exact(0), Unknown(0)]
+[Input(1), Exact(1), Exact(0), Unknown(0)]  <-veq
 [(1, 9), (1, 1), (0, 0), (4, 12)]
+[(1, 9), (1, 1), (0, 0), (4, 12)]  <-veq
 add y 25
 [Input(1), Unknown(4), Exact(25), Unknown(0)]
+[Input(1), Exact(1), Exact(25), Unknown(0)]  <-veq
 [(1, 9), (1, 1), (25, 25), (4, 12)]
+[(1, 9), (1, 1), (25, 25), (4, 12)]  <-veq
 mul y x
 [Input(1), Unknown(4), Unknown(5), Unknown(0)]
+[Input(1), Exact(1), Exact(25), Unknown(0)]  <-veq
 [(1, 9), (1, 1), (25, 25), (4, 12)]
+[(1, 9), (1, 1), (25, 25), (4, 12)]  <-veq
+  --> PRUNED
 add y 1
 [Input(1), Unknown(4), Unknown(6), Unknown(0)]
+[Input(1), Exact(1), Exact(26), Unknown(0)]  <-veq
 [(1, 9), (1, 1), (26, 26), (4, 12)]
+[(1, 9), (1, 1), (26, 26), (4, 12)]  <-veq
 mul z y
 [Input(1), Unknown(4), Unknown(6), Unknown(7)]
+[Input(1), Exact(1), Exact(26), Unknown(7)]  <-veq
 [(1, 9), (1, 1), (26, 26), (104, 312)]
+[(1, 9), (1, 1), (26, 26), (104, 312)]  <-veq
 mul y 0
 [Input(1), Unknown(4), Exact(0), Unknown(7)]
+[Input(1), Exact(1), Exact(0), Unknown(7)]  <-veq
 [(1, 9), (1, 1), (0, 0), (104, 312)]
+[(1, 9), (1, 1), (0, 0), (104, 312)]  <-veq
 add y w
 [Input(1), Unknown(4), Input(1), Unknown(7)]
+[Input(1), Exact(1), Input(1), Unknown(7)]  <-veq
 [(1, 9), (1, 1), (1, 9), (104, 312)]
+[(1, 9), (1, 1), (1, 9), (104, 312)]  <-veq
 add y 7
 [Input(1), Unknown(4), Unknown(8), Unknown(7)]
+[Input(1), Exact(1), Unknown(8), Unknown(7)]  <-veq
 [(1, 9), (1, 1), (8, 16), (104, 312)]
+[(1, 9), (1, 1), (8, 16), (104, 312)]  <-veq
 mul y x
 [Input(1), Unknown(4), Unknown(9), Unknown(7)]
+[Input(1), Exact(1), Unknown(8), Unknown(7)]  <-veq
 [(1, 9), (1, 1), (8, 16), (104, 312)]
+[(1, 9), (1, 1), (8, 16), (104, 312)]  <-veq
+  --> PRUNED
 add z y
 [Input(1), Unknown(4), Unknown(9), Unknown(10)]
+[Input(1), Exact(1), Unknown(8), Unknown(10)]  <-veq
 [(1, 9), (1, 1), (8, 16), (112, 328)]
+[(1, 9), (1, 1), (8, 16), (112, 328)]  <-veq
 inp w
 [Input(2), Unknown(4), Unknown(9), Unknown(10)]
+[Input(2), Exact(1), Unknown(8), Unknown(10)]  <-veq
 [(1, 9), (1, 1), (8, 16), (112, 328)]
+[(1, 9), (1, 1), (8, 16), (112, 328)]  <-veq
 mul x 0
 [Input(2), Exact(0), Unknown(9), Unknown(10)]
+[Input(2), Exact(0), Unknown(8), Unknown(10)]  <-veq
 [(1, 9), (0, 0), (8, 16), (112, 328)]
+[(1, 9), (0, 0), (8, 16), (112, 328)]  <-veq
 add x z
 [Input(2), Unknown(10), Unknown(9), Unknown(10)]
+[Input(2), Unknown(10), Unknown(8), Unknown(10)]  <-veq
 [(1, 9), (112, 328), (8, 16), (112, 328)]
+[(1, 9), (112, 328), (8, 16), (112, 328)]  <-veq
 mod x 26
 [Input(2), Unknown(11), Unknown(9), Unknown(10)]
+[Input(2), Unknown(11), Unknown(8), Unknown(10)]  <-veq
 [(1, 9), (0, 25), (8, 16), (112, 328)]
+[(1, 9), (0, 25), (8, 16), (112, 328)]  <-veq
 div z 1
 [Input(2), Unknown(11), Unknown(9), Unknown(10)]
+[Input(2), Unknown(11), Unknown(8), Unknown(10)]  <-veq
 [(1, 9), (0, 25), (8, 16), (112, 328)]
+[(1, 9), (0, 25), (8, 16), (112, 328)]  <-veq
   --> PRUNED
 add x 13
 [Input(2), Unknown(12), Unknown(9), Unknown(10)]
+[Input(2), Unknown(12), Unknown(8), Unknown(10)]  <-veq
 [(1, 9), (13, 38), (8, 16), (112, 328)]
+[(1, 9), (13, 38), (8, 16), (112, 328)]  <-veq
 eql x w
 [Input(2), Unknown(13), Unknown(9), Unknown(10)]
+[Input(2), Exact(0), Unknown(8), Unknown(10)]  <-veq
 [(1, 9), (0, 0), (8, 16), (112, 328)]
+[(1, 9), (0, 0), (8, 16), (112, 328)]  <-veq
 eql x 0
 [Input(2), Unknown(14), Unknown(9), Unknown(10)]
+[Input(2), Exact(1), Unknown(8), Unknown(10)]  <-veq
 [(1, 9), (1, 1), (8, 16), (112, 328)]
+[(1, 9), (1, 1), (8, 16), (112, 328)]  <-veq
 mul y 0
 [Input(2), Unknown(14), Exact(0), Unknown(10)]
+[Input(2), Exact(1), Exact(0), Unknown(10)]  <-veq
 [(1, 9), (1, 1), (0, 0), (112, 328)]
+[(1, 9), (1, 1), (0, 0), (112, 328)]  <-veq
 add y 25
 [Input(2), Unknown(14), Exact(25), Unknown(10)]
+[Input(2), Exact(1), Exact(25), Unknown(10)]  <-veq
 [(1, 9), (1, 1), (25, 25), (112, 328)]
+[(1, 9), (1, 1), (25, 25), (112, 328)]  <-veq
 mul y x
 [Input(2), Unknown(14), Unknown(15), Unknown(10)]
+[Input(2), Exact(1), Exact(25), Unknown(10)]  <-veq
 [(1, 9), (1, 1), (25, 25), (112, 328)]
+[(1, 9), (1, 1), (25, 25), (112, 328)]  <-veq
+  --> PRUNED
 add y 1
 [Input(2), Unknown(14), Unknown(16), Unknown(10)]
+[Input(2), Exact(1), Exact(26), Unknown(10)]  <-veq
 [(1, 9), (1, 1), (26, 26), (112, 328)]
+[(1, 9), (1, 1), (26, 26), (112, 328)]  <-veq
 mul z y
 [Input(2), Unknown(14), Unknown(16), Unknown(17)]
+[Input(2), Exact(1), Exact(26), Unknown(17)]  <-veq
 [(1, 9), (1, 1), (26, 26), (2912, 8528)]
+[(1, 9), (1, 1), (26, 26), (2912, 8528)]  <-veq
 mul y 0
 [Input(2), Unknown(14), Exact(0), Unknown(17)]
+[Input(2), Exact(1), Exact(0), Unknown(17)]  <-veq
 [(1, 9), (1, 1), (0, 0), (2912, 8528)]
+[(1, 9), (1, 1), (0, 0), (2912, 8528)]  <-veq
 add y w
 [Input(2), Unknown(14), Input(2), Unknown(17)]
+[Input(2), Exact(1), Input(2), Unknown(17)]  <-veq
 [(1, 9), (1, 1), (1, 9), (2912, 8528)]
+[(1, 9), (1, 1), (1, 9), (2912, 8528)]  <-veq
 add y 1
 [Input(2), Unknown(14), Unknown(18), Unknown(17)]
+[Input(2), Exact(1), Unknown(18), Unknown(17)]  <-veq
 [(1, 9), (1, 1), (2, 10), (2912, 8528)]
+[(1, 9), (1, 1), (2, 10), (2912, 8528)]  <-veq
 mul y x
 [Input(2), Unknown(14), Unknown(19), Unknown(17)]
+[Input(2), Exact(1), Unknown(18), Unknown(17)]  <-veq
 [(1, 9), (1, 1), (2, 10), (2912, 8528)]
+[(1, 9), (1, 1), (2, 10), (2912, 8528)]  <-veq
+  --> PRUNED
 add z y
 [Input(2), Unknown(14), Unknown(19), Unknown(20)]
+[Input(2), Exact(1), Unknown(18), Unknown(20)]  <-veq
 [(1, 9), (1, 1), (2, 10), (2914, 8538)]
+[(1, 9), (1, 1), (2, 10), (2914, 8538)]  <-veq
 inp w
 [Input(3), Unknown(14), Unknown(19), Unknown(20)]
+[Input(3), Exact(1), Unknown(18), Unknown(20)]  <-veq
 [(1, 9), (1, 1), (2, 10), (2914, 8538)]
+[(1, 9), (1, 1), (2, 10), (2914, 8538)]  <-veq
 mul x 0
 [Input(3), Exact(0), Unknown(19), Unknown(20)]
+[Input(3), Exact(0), Unknown(18), Unknown(20)]  <-veq
 [(1, 9), (0, 0), (2, 10), (2914, 8538)]
+[(1, 9), (0, 0), (2, 10), (2914, 8538)]  <-veq
 add x z
 [Input(3), Unknown(20), Unknown(19), Unknown(20)]
+[Input(3), Unknown(20), Unknown(18), Unknown(20)]  <-veq
 [(1, 9), (2914, 8538), (2, 10), (2914, 8538)]
+[(1, 9), (2914, 8538), (2, 10), (2914, 8538)]  <-veq
 mod x 26
 [Input(3), Unknown(21), Unknown(19), Unknown(20)]
+[Input(3), Unknown(21), Unknown(18), Unknown(20)]  <-veq
 [(1, 9), (0, 25), (2, 10), (2914, 8538)]
+[(1, 9), (0, 25), (2, 10), (2914, 8538)]  <-veq
 div z 26
 [Input(3), Unknown(21), Unknown(19), Unknown(22)]
+[Input(3), Unknown(21), Unknown(18), Unknown(22)]  <-veq
 [(1, 9), (0, 25), (2, 10), (112, 328)]
+[(1, 9), (0, 25), (2, 10), (112, 328)]  <-veq
 add x -4
 [Input(3), Unknown(23), Unknown(19), Unknown(22)]
+[Input(3), Unknown(23), Unknown(18), Unknown(22)]  <-veq
 [(1, 9), (-4, 21), (2, 10), (112, 328)]
+[(1, 9), (-4, 21), (2, 10), (112, 328)]  <-veq
 eql x w
 [Input(3), Unknown(24), Unknown(19), Unknown(22)]
+[Input(3), Unknown(24), Unknown(18), Unknown(22)]  <-veq
 [(1, 9), (0, 1), (2, 10), (112, 328)]
+[(1, 9), (0, 1), (2, 10), (112, 328)]  <-veq
 eql x 0
 [Input(3), Unknown(25), Unknown(19), Unknown(22)]
+[Input(3), Unknown(25), Unknown(18), Unknown(22)]  <-veq
 [(1, 9), (0, 1), (2, 10), (112, 328)]
+[(1, 9), (0, 1), (2, 10), (112, 328)]  <-veq
 mul y 0
 [Input(3), Unknown(25), Exact(0), Unknown(22)]
+[Input(3), Unknown(25), Exact(0), Unknown(22)]  <-veq
 [(1, 9), (0, 1), (0, 0), (112, 328)]
+[(1, 9), (0, 1), (0, 0), (112, 328)]  <-veq
 add y 25
 [Input(3), Unknown(25), Exact(25), Unknown(22)]
+[Input(3), Unknown(25), Exact(25), Unknown(22)]  <-veq
 [(1, 9), (0, 1), (25, 25), (112, 328)]
+[(1, 9), (0, 1), (25, 25), (112, 328)]  <-veq
 mul y x
 [Input(3), Unknown(25), Unknown(26), Unknown(22)]
+[Input(3), Unknown(25), Unknown(26), Unknown(22)]  <-veq
 [(1, 9), (0, 1), (0, 25), (112, 328)]
+[(1, 9), (0, 1), (0, 25), (112, 328)]  <-veq
 add y 1
 [Input(3), Unknown(25), Unknown(27), Unknown(22)]
+[Input(3), Unknown(25), Unknown(27), Unknown(22)]  <-veq
 [(1, 9), (0, 1), (1, 26), (112, 328)]
+[(1, 9), (0, 1), (1, 26), (112, 328)]  <-veq
 mul z y
 [Input(3), Unknown(25), Unknown(27), Unknown(28)]
+[Input(3), Unknown(25), Unknown(27), Unknown(28)]  <-veq
 [(1, 9), (0, 1), (1, 26), (112, 8528)]
+[(1, 9), (0, 1), (1, 26), (112, 8528)]  <-veq
 mul y 0
 [Input(3), Unknown(25), Exact(0), Unknown(28)]
+[Input(3), Unknown(25), Exact(0), Unknown(28)]  <-veq
 [(1, 9), (0, 1), (0, 0), (112, 8528)]
+[(1, 9), (0, 1), (0, 0), (112, 8528)]  <-veq
 add y w
 [Input(3), Unknown(25), Input(3), Unknown(28)]
+[Input(3), Unknown(25), Input(3), Unknown(28)]  <-veq
 [(1, 9), (0, 1), (1, 9), (112, 8528)]
+[(1, 9), (0, 1), (1, 9), (112, 8528)]  <-veq
 add y 6
 [Input(3), Unknown(25), Unknown(29), Unknown(28)]
+[Input(3), Unknown(25), Unknown(29), Unknown(28)]  <-veq
 [(1, 9), (0, 1), (7, 15), (112, 8528)]
+[(1, 9), (0, 1), (7, 15), (112, 8528)]  <-veq
 mul y x
 [Input(3), Unknown(25), Unknown(30), Unknown(28)]
+[Input(3), Unknown(25), Unknown(30), Unknown(28)]  <-veq
 [(1, 9), (0, 1), (0, 15), (112, 8528)]
+[(1, 9), (0, 1), (0, 15), (112, 8528)]  <-veq
 add z y
 [Input(3), Unknown(25), Unknown(30), Unknown(31)]
+[Input(3), Unknown(25), Unknown(30), Unknown(31)]  <-veq
 [(1, 9), (0, 1), (0, 15), (112, 8543)]
+[(1, 9), (0, 1), (0, 15), (112, 8543)]  <-veq
 inp w
 [Input(4), Unknown(25), Unknown(30), Unknown(31)]
+[Input(4), Unknown(25), Unknown(30), Unknown(31)]  <-veq
 [(1, 9), (0, 1), (0, 15), (112, 8543)]
+[(1, 9), (0, 1), (0, 15), (112, 8543)]  <-veq
 mul x 0
 [Input(4), Exact(0), Unknown(30), Unknown(31)]
+[Input(4), Exact(0), Unknown(30), Unknown(31)]  <-veq
 [(1, 9), (0, 0), (0, 15), (112, 8543)]
+[(1, 9), (0, 0), (0, 15), (112, 8543)]  <-veq
 add x z
 [Input(4), Unknown(31), Unknown(30), Unknown(31)]
+[Input(4), Unknown(31), Unknown(30), Unknown(31)]  <-veq
 [(1, 9), (112, 8543), (0, 15), (112, 8543)]
+[(1, 9), (112, 8543), (0, 15), (112, 8543)]  <-veq
 mod x 26
 [Input(4), Unknown(32), Unknown(30), Unknown(31)]
+[Input(4), Unknown(32), Unknown(30), Unknown(31)]  <-veq
 [(1, 9), (0, 25), (0, 15), (112, 8543)]
+[(1, 9), (0, 25), (0, 15), (112, 8543)]  <-veq
 div z 1
 [Input(4), Unknown(32), Unknown(30), Unknown(31)]
+[Input(4), Unknown(32), Unknown(30), Unknown(31)]  <-veq
 [(1, 9), (0, 25), (0, 15), (112, 8543)]
+[(1, 9), (0, 25), (0, 15), (112, 8543)]  <-veq
   --> PRUNED
 add x 11
 [Input(4), Unknown(33), Unknown(30), Unknown(31)]
+[Input(4), Unknown(33), Unknown(30), Unknown(31)]  <-veq
 [(1, 9), (11, 36), (0, 15), (112, 8543)]
+[(1, 9), (11, 36), (0, 15), (112, 8543)]  <-veq
 eql x w
 [Input(4), Unknown(34), Unknown(30), Unknown(31)]
+[Input(4), Exact(0), Unknown(30), Unknown(31)]  <-veq
 [(1, 9), (0, 0), (0, 15), (112, 8543)]
+[(1, 9), (0, 0), (0, 15), (112, 8543)]  <-veq
 eql x 0
 [Input(4), Unknown(35), Unknown(30), Unknown(31)]
+[Input(4), Exact(1), Unknown(30), Unknown(31)]  <-veq
 [(1, 9), (1, 1), (0, 15), (112, 8543)]
+[(1, 9), (1, 1), (0, 15), (112, 8543)]  <-veq
 mul y 0
 [Input(4), Unknown(35), Exact(0), Unknown(31)]
+[Input(4), Exact(1), Exact(0), Unknown(31)]  <-veq
 [(1, 9), (1, 1), (0, 0), (112, 8543)]
+[(1, 9), (1, 1), (0, 0), (112, 8543)]  <-veq
 add y 25
 [Input(4), Unknown(35), Exact(25), Unknown(31)]
+[Input(4), Exact(1), Exact(25), Unknown(31)]  <-veq
 [(1, 9), (1, 1), (25, 25), (112, 8543)]
+[(1, 9), (1, 1), (25, 25), (112, 8543)]  <-veq
 mul y x
 [Input(4), Unknown(35), Unknown(36), Unknown(31)]
+[Input(4), Exact(1), Exact(25), Unknown(31)]  <-veq
 [(1, 9), (1, 1), (25, 25), (112, 8543)]
+[(1, 9), (1, 1), (25, 25), (112, 8543)]  <-veq
+  --> PRUNED
 add y 1
 [Input(4), Unknown(35), Unknown(37), Unknown(31)]
+[Input(4), Exact(1), Exact(26), Unknown(31)]  <-veq
 [(1, 9), (1, 1), (26, 26), (112, 8543)]
+[(1, 9), (1, 1), (26, 26), (112, 8543)]  <-veq
 mul z y
 [Input(4), Unknown(35), Unknown(37), Unknown(38)]
+[Input(4), Exact(1), Exact(26), Unknown(38)]  <-veq
 [(1, 9), (1, 1), (26, 26), (2912, 222118)]
+[(1, 9), (1, 1), (26, 26), (2912, 222118)]  <-veq
 mul y 0
 [Input(4), Unknown(35), Exact(0), Unknown(38)]
+[Input(4), Exact(1), Exact(0), Unknown(38)]  <-veq
 [(1, 9), (1, 1), (0, 0), (2912, 222118)]
+[(1, 9), (1, 1), (0, 0), (2912, 222118)]  <-veq
 add y w
 [Input(4), Unknown(35), Input(4), Unknown(38)]
+[Input(4), Exact(1), Input(4), Unknown(38)]  <-veq
 [(1, 9), (1, 1), (1, 9), (2912, 222118)]
+[(1, 9), (1, 1), (1, 9), (2912, 222118)]  <-veq
 add y 14
 [Input(4), Unknown(35), Unknown(39), Unknown(38)]
+[Input(4), Exact(1), Unknown(39), Unknown(38)]  <-veq
 [(1, 9), (1, 1), (15, 23), (2912, 222118)]
+[(1, 9), (1, 1), (15, 23), (2912, 222118)]  <-veq
 mul y x
 [Input(4), Unknown(35), Unknown(40), Unknown(38)]
+[Input(4), Exact(1), Unknown(39), Unknown(38)]  <-veq
 [(1, 9), (1, 1), (15, 23), (2912, 222118)]
+[(1, 9), (1, 1), (15, 23), (2912, 222118)]  <-veq
+  --> PRUNED
 add z y
 [Input(4), Unknown(35), Unknown(40), Unknown(41)]
+[Input(4), Exact(1), Unknown(39), Unknown(41)]  <-veq
 [(1, 9), (1, 1), (15, 23), (2927, 222141)]
+[(1, 9), (1, 1), (15, 23), (2927, 222141)]  <-veq
 inp w
 [Input(5), Unknown(35), Unknown(40), Unknown(41)]
+[Input(5), Exact(1), Unknown(39), Unknown(41)]  <-veq
 [(1, 9), (1, 1), (15, 23), (2927, 222141)]
+[(1, 9), (1, 1), (15, 23), (2927, 222141)]  <-veq
 mul x 0
 [Input(5), Exact(0), Unknown(40), Unknown(41)]
+[Input(5), Exact(0), Unknown(39), Unknown(41)]  <-veq
 [(1, 9), (0, 0), (15, 23), (2927, 222141)]
+[(1, 9), (0, 0), (15, 23), (2927, 222141)]  <-veq
 add x z
 [Input(5), Unknown(41), Unknown(40), Unknown(41)]
+[Input(5), Unknown(41), Unknown(39), Unknown(41)]  <-veq
 [(1, 9), (2927, 222141), (15, 23), (2927, 222141)]
+[(1, 9), (2927, 222141), (15, 23), (2927, 222141)]  <-veq
 mod x 26
 [Input(5), Unknown(42), Unknown(40), Unknown(41)]
+[Input(5), Unknown(42), Unknown(39), Unknown(41)]  <-veq
 [(1, 9), (0, 25), (15, 23), (2927, 222141)]
+[(1, 9), (0, 25), (15, 23), (2927, 222141)]  <-veq
 div z 1
 [Input(5), Unknown(42), Unknown(40), Unknown(41)]
+[Input(5), Unknown(42), Unknown(39), Unknown(41)]  <-veq
 [(1, 9), (0, 25), (15, 23), (2927, 222141)]
+[(1, 9), (0, 25), (15, 23), (2927, 222141)]  <-veq
   --> PRUNED
 add x 10
 [Input(5), Unknown(43), Unknown(40), Unknown(41)]
+[Input(5), Unknown(43), Unknown(39), Unknown(41)]  <-veq
 [(1, 9), (10, 35), (15, 23), (2927, 222141)]
+[(1, 9), (10, 35), (15, 23), (2927, 222141)]  <-veq
 eql x w
 [Input(5), Unknown(44), Unknown(40), Unknown(41)]
+[Input(5), Exact(0), Unknown(39), Unknown(41)]  <-veq
 [(1, 9), (0, 0), (15, 23), (2927, 222141)]
+[(1, 9), (0, 0), (15, 23), (2927, 222141)]  <-veq
 eql x 0
 [Input(5), Unknown(45), Unknown(40), Unknown(41)]
+[Input(5), Exact(1), Unknown(39), Unknown(41)]  <-veq
 [(1, 9), (1, 1), (15, 23), (2927, 222141)]
+[(1, 9), (1, 1), (15, 23), (2927, 222141)]  <-veq
 mul y 0
 [Input(5), Unknown(45), Exact(0), Unknown(41)]
+[Input(5), Exact(1), Exact(0), Unknown(41)]  <-veq
 [(1, 9), (1, 1), (0, 0), (2927, 222141)]
+[(1, 9), (1, 1), (0, 0), (2927, 222141)]  <-veq
 add y 25
 [Input(5), Unknown(45), Exact(25), Unknown(41)]
+[Input(5), Exact(1), Exact(25), Unknown(41)]  <-veq
 [(1, 9), (1, 1), (25, 25), (2927, 222141)]
+[(1, 9), (1, 1), (25, 25), (2927, 222141)]  <-veq
 mul y x
 [Input(5), Unknown(45), Unknown(46), Unknown(41)]
+[Input(5), Exact(1), Exact(25), Unknown(41)]  <-veq
 [(1, 9), (1, 1), (25, 25), (2927, 222141)]
+[(1, 9), (1, 1), (25, 25), (2927, 222141)]  <-veq
+  --> PRUNED
 add y 1
 [Input(5), Unknown(45), Unknown(47), Unknown(41)]
+[Input(5), Exact(1), Exact(26), Unknown(41)]  <-veq
 [(1, 9), (1, 1), (26, 26), (2927, 222141)]
+[(1, 9), (1, 1), (26, 26), (2927, 222141)]  <-veq
 mul z y
 [Input(5), Unknown(45), Unknown(47), Unknown(48)]
+[Input(5), Exact(1), Exact(26), Unknown(48)]  <-veq
 [(1, 9), (1, 1), (26, 26), (76102, 5775666)]
+[(1, 9), (1, 1), (26, 26), (76102, 5775666)]  <-veq
 mul y 0
 [Input(5), Unknown(45), Exact(0), Unknown(48)]
+[Input(5), Exact(1), Exact(0), Unknown(48)]  <-veq
 [(1, 9), (1, 1), (0, 0), (76102, 5775666)]
+[(1, 9), (1, 1), (0, 0), (76102, 5775666)]  <-veq
 add y w
 [Input(5), Unknown(45), Input(5), Unknown(48)]
+[Input(5), Exact(1), Input(5), Unknown(48)]  <-veq
 [(1, 9), (1, 1), (1, 9), (76102, 5775666)]
+[(1, 9), (1, 1), (1, 9), (76102, 5775666)]  <-veq
 add y 7
 [Input(5), Unknown(45), Unknown(49), Unknown(48)]
+[Input(5), Exact(1), Unknown(49), Unknown(48)]  <-veq
 [(1, 9), (1, 1), (8, 16), (76102, 5775666)]
+[(1, 9), (1, 1), (8, 16), (76102, 5775666)]  <-veq
 mul y x
 [Input(5), Unknown(45), Unknown(50), Unknown(48)]
+[Input(5), Exact(1), Unknown(49), Unknown(48)]  <-veq
 [(1, 9), (1, 1), (8, 16), (76102, 5775666)]
+[(1, 9), (1, 1), (8, 16), (76102, 5775666)]  <-veq
+  --> PRUNED
 add z y
 [Input(5), Unknown(45), Unknown(50), Unknown(51)]
+[Input(5), Exact(1), Unknown(49), Unknown(51)]  <-veq
 [(1, 9), (1, 1), (8, 16), (76110, 5775682)]
+[(1, 9), (1, 1), (8, 16), (76110, 5775682)]  <-veq
 inp w
 [Input(6), Unknown(45), Unknown(50), Unknown(51)]
+[Input(6), Exact(1), Unknown(49), Unknown(51)]  <-veq
 [(1, 9), (1, 1), (8, 16), (76110, 5775682)]
+[(1, 9), (1, 1), (8, 16), (76110, 5775682)]  <-veq
 mul x 0
 [Input(6), Exact(0), Unknown(50), Unknown(51)]
+[Input(6), Exact(0), Unknown(49), Unknown(51)]  <-veq
 [(1, 9), (0, 0), (8, 16), (76110, 5775682)]
+[(1, 9), (0, 0), (8, 16), (76110, 5775682)]  <-veq
 add x z
 [Input(6), Unknown(51), Unknown(50), Unknown(51)]
+[Input(6), Unknown(51), Unknown(49), Unknown(51)]  <-veq
 [(1, 9), (76110, 5775682), (8, 16), (76110, 5775682)]
+[(1, 9), (76110, 5775682), (8, 16), (76110, 5775682)]  <-veq
 mod x 26
 [Input(6), Unknown(52), Unknown(50), Unknown(51)]
+[Input(6), Unknown(52), Unknown(49), Unknown(51)]  <-veq
 [(1, 9), (0, 25), (8, 16), (76110, 5775682)]
+[(1, 9), (0, 25), (8, 16), (76110, 5775682)]  <-veq
 div z 26
 [Input(6), Unknown(52), Unknown(50), Unknown(53)]
+[Input(6), Unknown(52), Unknown(49), Unknown(53)]  <-veq
 [(1, 9), (0, 25), (8, 16), (2927, 222141)]
+[(1, 9), (0, 25), (8, 16), (2927, 222141)]  <-veq
 add x -4
 [Input(6), Unknown(54), Unknown(50), Unknown(53)]
+[Input(6), Unknown(54), Unknown(49), Unknown(53)]  <-veq
 [(1, 9), (-4, 21), (8, 16), (2927, 222141)]
+[(1, 9), (-4, 21), (8, 16), (2927, 222141)]  <-veq
 eql x w
 [Input(6), Unknown(55), Unknown(50), Unknown(53)]
+[Input(6), Unknown(55), Unknown(49), Unknown(53)]  <-veq
 [(1, 9), (0, 1), (8, 16), (2927, 222141)]
+[(1, 9), (0, 1), (8, 16), (2927, 222141)]  <-veq
 eql x 0
 [Input(6), Unknown(56), Unknown(50), Unknown(53)]
+[Input(6), Unknown(56), Unknown(49), Unknown(53)]  <-veq
 [(1, 9), (0, 1), (8, 16), (2927, 222141)]
+[(1, 9), (0, 1), (8, 16), (2927, 222141)]  <-veq
 mul y 0
 [Input(6), Unknown(56), Exact(0), Unknown(53)]
+[Input(6), Unknown(56), Exact(0), Unknown(53)]  <-veq
 [(1, 9), (0, 1), (0, 0), (2927, 222141)]
+[(1, 9), (0, 1), (0, 0), (2927, 222141)]  <-veq
 add y 25
 [Input(6), Unknown(56), Exact(25), Unknown(53)]
+[Input(6), Unknown(56), Exact(25), Unknown(53)]  <-veq
 [(1, 9), (0, 1), (25, 25), (2927, 222141)]
+[(1, 9), (0, 1), (25, 25), (2927, 222141)]  <-veq
 mul y x
 [Input(6), Unknown(56), Unknown(57), Unknown(53)]
+[Input(6), Unknown(56), Unknown(57), Unknown(53)]  <-veq
 [(1, 9), (0, 1), (0, 25), (2927, 222141)]
+[(1, 9), (0, 1), (0, 25), (2927, 222141)]  <-veq
 add y 1
 [Input(6), Unknown(56), Unknown(58), Unknown(53)]
+[Input(6), Unknown(56), Unknown(58), Unknown(53)]  <-veq
 [(1, 9), (0, 1), (1, 26), (2927, 222141)]
+[(1, 9), (0, 1), (1, 26), (2927, 222141)]  <-veq
 mul z y
 [Input(6), Unknown(56), Unknown(58), Unknown(59)]
+[Input(6), Unknown(56), Unknown(58), Unknown(59)]  <-veq
 [(1, 9), (0, 1), (1, 26), (2927, 5775666)]
+[(1, 9), (0, 1), (1, 26), (2927, 5775666)]  <-veq
 mul y 0
 [Input(6), Unknown(56), Exact(0), Unknown(59)]
+[Input(6), Unknown(56), Exact(0), Unknown(59)]  <-veq
 [(1, 9), (0, 1), (0, 0), (2927, 5775666)]
+[(1, 9), (0, 1), (0, 0), (2927, 5775666)]  <-veq
 add y w
 [Input(6), Unknown(56), Input(6), Unknown(59)]
+[Input(6), Unknown(56), Input(6), Unknown(59)]  <-veq
 [(1, 9), (0, 1), (1, 9), (2927, 5775666)]
+[(1, 9), (0, 1), (1, 9), (2927, 5775666)]  <-veq
 add y 9
 [Input(6), Unknown(56), Unknown(60), Unknown(59)]
+[Input(6), Unknown(56), Unknown(60), Unknown(59)]  <-veq
 [(1, 9), (0, 1), (10, 18), (2927, 5775666)]
+[(1, 9), (0, 1), (10, 18), (2927, 5775666)]  <-veq
 mul y x
 [Input(6), Unknown(56), Unknown(61), Unknown(59)]
+[Input(6), Unknown(56), Unknown(61), Unknown(59)]  <-veq
 [(1, 9), (0, 1), (0, 18), (2927, 5775666)]
+[(1, 9), (0, 1), (0, 18), (2927, 5775666)]  <-veq
 add z y
 [Input(6), Unknown(56), Unknown(61), Unknown(62)]
+[Input(6), Unknown(56), Unknown(61), Unknown(62)]  <-veq
 [(1, 9), (0, 1), (0, 18), (2927, 5775684)]
+[(1, 9), (0, 1), (0, 18), (2927, 5775684)]  <-veq
 inp w
 [Input(7), Unknown(56), Unknown(61), Unknown(62)]
+[Input(7), Unknown(56), Unknown(61), Unknown(62)]  <-veq
 [(1, 9), (0, 1), (0, 18), (2927, 5775684)]
+[(1, 9), (0, 1), (0, 18), (2927, 5775684)]  <-veq
 mul x 0
 [Input(7), Exact(0), Unknown(61), Unknown(62)]
+[Input(7), Exact(0), Unknown(61), Unknown(62)]  <-veq
 [(1, 9), (0, 0), (0, 18), (2927, 5775684)]
+[(1, 9), (0, 0), (0, 18), (2927, 5775684)]  <-veq
 add x z
 [Input(7), Unknown(62), Unknown(61), Unknown(62)]
+[Input(7), Unknown(62), Unknown(61), Unknown(62)]  <-veq
 [(1, 9), (2927, 5775684), (0, 18), (2927, 5775684)]
+[(1, 9), (2927, 5775684), (0, 18), (2927, 5775684)]  <-veq
 mod x 26
 [Input(7), Unknown(63), Unknown(61), Unknown(62)]
+[Input(7), Unknown(63), Unknown(61), Unknown(62)]  <-veq
 [(1, 9), (0, 25), (0, 18), (2927, 5775684)]
+[(1, 9), (0, 25), (0, 18), (2927, 5775684)]  <-veq
 div z 26
 [Input(7), Unknown(63), Unknown(61), Unknown(64)]
+[Input(7), Unknown(63), Unknown(61), Unknown(64)]  <-veq
 [(1, 9), (0, 25), (0, 18), (112, 222141)]
+[(1, 9), (0, 25), (0, 18), (112, 222141)]  <-veq
 add x -12
 [Input(7), Unknown(65), Unknown(61), Unknown(64)]
+[Input(7), Unknown(65), Unknown(61), Unknown(64)]  <-veq
 [(1, 9), (-12, 13), (0, 18), (112, 222141)]
+[(1, 9), (-12, 13), (0, 18), (112, 222141)]  <-veq
 eql x w
 [Input(7), Unknown(66), Unknown(61), Unknown(64)]
+[Input(7), Unknown(66), Unknown(61), Unknown(64)]  <-veq
 [(1, 9), (0, 1), (0, 18), (112, 222141)]
+[(1, 9), (0, 1), (0, 18), (112, 222141)]  <-veq
 eql x 0
 [Input(7), Unknown(67), Unknown(61), Unknown(64)]
+[Input(7), Unknown(67), Unknown(61), Unknown(64)]  <-veq
 [(1, 9), (0, 1), (0, 18), (112, 222141)]
+[(1, 9), (0, 1), (0, 18), (112, 222141)]  <-veq
 mul y 0
 [Input(7), Unknown(67), Exact(0), Unknown(64)]
+[Input(7), Unknown(67), Exact(0), Unknown(64)]  <-veq
 [(1, 9), (0, 1), (0, 0), (112, 222141)]
+[(1, 9), (0, 1), (0, 0), (112, 222141)]  <-veq
 add y 25
 [Input(7), Unknown(67), Exact(25), Unknown(64)]
+[Input(7), Unknown(67), Exact(25), Unknown(64)]  <-veq
 [(1, 9), (0, 1), (25, 25), (112, 222141)]
+[(1, 9), (0, 1), (25, 25), (112, 222141)]  <-veq
 mul y x
 [Input(7), Unknown(67), Unknown(68), Unknown(64)]
+[Input(7), Unknown(67), Unknown(68), Unknown(64)]  <-veq
 [(1, 9), (0, 1), (0, 25), (112, 222141)]
+[(1, 9), (0, 1), (0, 25), (112, 222141)]  <-veq
 add y 1
 [Input(7), Unknown(67), Unknown(69), Unknown(64)]
+[Input(7), Unknown(67), Unknown(69), Unknown(64)]  <-veq
 [(1, 9), (0, 1), (1, 26), (112, 222141)]
+[(1, 9), (0, 1), (1, 26), (112, 222141)]  <-veq
 mul z y
 [Input(7), Unknown(67), Unknown(69), Unknown(70)]
+[Input(7), Unknown(67), Unknown(69), Unknown(70)]  <-veq
 [(1, 9), (0, 1), (1, 26), (112, 5775666)]
+[(1, 9), (0, 1), (1, 26), (112, 5775666)]  <-veq
 mul y 0
 [Input(7), Unknown(67), Exact(0), Unknown(70)]
+[Input(7), Unknown(67), Exact(0), Unknown(70)]  <-veq
 [(1, 9), (0, 1), (0, 0), (112, 5775666)]
+[(1, 9), (0, 1), (0, 0), (112, 5775666)]  <-veq
 add y w
 [Input(7), Unknown(67), Input(7), Unknown(70)]
+[Input(7), Unknown(67), Input(7), Unknown(70)]  <-veq
 [(1, 9), (0, 1), (1, 9), (112, 5775666)]
+[(1, 9), (0, 1), (1, 9), (112, 5775666)]  <-veq
 add y 9
 [Input(7), Unknown(67), Unknown(71), Unknown(70)]
+[Input(7), Unknown(67), Unknown(71), Unknown(70)]  <-veq
 [(1, 9), (0, 1), (10, 18), (112, 5775666)]
+[(1, 9), (0, 1), (10, 18), (112, 5775666)]  <-veq
 mul y x
 [Input(7), Unknown(67), Unknown(72), Unknown(70)]
+[Input(7), Unknown(67), Unknown(72), Unknown(70)]  <-veq
 [(1, 9), (0, 1), (0, 18), (112, 5775666)]
+[(1, 9), (0, 1), (0, 18), (112, 5775666)]  <-veq
 add z y
 [Input(7), Unknown(67), Unknown(72), Unknown(73)]
+[Input(7), Unknown(67), Unknown(72), Unknown(73)]  <-veq
 [(1, 9), (0, 1), (0, 18), (112, 5775684)]
+[(1, 9), (0, 1), (0, 18), (112, 5775684)]  <-veq
 inp w
 [Input(8), Unknown(67), Unknown(72), Unknown(73)]
+[Input(8), Unknown(67), Unknown(72), Unknown(73)]  <-veq
 [(1, 9), (0, 1), (0, 18), (112, 5775684)]
+[(1, 9), (0, 1), (0, 18), (112, 5775684)]  <-veq
 mul x 0
 [Input(8), Exact(0), Unknown(72), Unknown(73)]
+[Input(8), Exact(0), Unknown(72), Unknown(73)]  <-veq
 [(1, 9), (0, 0), (0, 18), (112, 5775684)]
+[(1, 9), (0, 0), (0, 18), (112, 5775684)]  <-veq
 add x z
 [Input(8), Unknown(73), Unknown(72), Unknown(73)]
+[Input(8), Unknown(73), Unknown(72), Unknown(73)]  <-veq
 [(1, 9), (112, 5775684), (0, 18), (112, 5775684)]
+[(1, 9), (112, 5775684), (0, 18), (112, 5775684)]  <-veq
 mod x 26
 [Input(8), Unknown(74), Unknown(72), Unknown(73)]
+[Input(8), Unknown(74), Unknown(72), Unknown(73)]  <-veq
 [(1, 9), (0, 25), (0, 18), (112, 5775684)]
+[(1, 9), (0, 25), (0, 18), (112, 5775684)]  <-veq
 div z 1
 [Input(8), Unknown(74), Unknown(72), Unknown(73)]
+[Input(8), Unknown(74), Unknown(72), Unknown(73)]  <-veq
 [(1, 9), (0, 25), (0, 18), (112, 5775684)]
+[(1, 9), (0, 25), (0, 18), (112, 5775684)]  <-veq
   --> PRUNED
 add x 10
 [Input(8), Unknown(75), Unknown(72), Unknown(73)]
+[Input(8), Unknown(75), Unknown(72), Unknown(73)]  <-veq
 [(1, 9), (10, 35), (0, 18), (112, 5775684)]
+[(1, 9), (10, 35), (0, 18), (112, 5775684)]  <-veq
 eql x w
 [Input(8), Unknown(76), Unknown(72), Unknown(73)]
+[Input(8), Exact(0), Unknown(72), Unknown(73)]  <-veq
 [(1, 9), (0, 0), (0, 18), (112, 5775684)]
+[(1, 9), (0, 0), (0, 18), (112, 5775684)]  <-veq
 eql x 0
 [Input(8), Unknown(77), Unknown(72), Unknown(73)]
+[Input(8), Exact(1), Unknown(72), Unknown(73)]  <-veq
 [(1, 9), (1, 1), (0, 18), (112, 5775684)]
+[(1, 9), (1, 1), (0, 18), (112, 5775684)]  <-veq
 mul y 0
 [Input(8), Unknown(77), Exact(0), Unknown(73)]
+[Input(8), Exact(1), Exact(0), Unknown(73)]  <-veq
 [(1, 9), (1, 1), (0, 0), (112, 5775684)]
+[(1, 9), (1, 1), (0, 0), (112, 5775684)]  <-veq
 add y 25
 [Input(8), Unknown(77), Exact(25), Unknown(73)]
+[Input(8), Exact(1), Exact(25), Unknown(73)]  <-veq
 [(1, 9), (1, 1), (25, 25), (112, 5775684)]
+[(1, 9), (1, 1), (25, 25), (112, 5775684)]  <-veq
 mul y x
 [Input(8), Unknown(77), Unknown(78), Unknown(73)]
+[Input(8), Exact(1), Exact(25), Unknown(73)]  <-veq
 [(1, 9), (1, 1), (25, 25), (112, 5775684)]
+[(1, 9), (1, 1), (25, 25), (112, 5775684)]  <-veq
+  --> PRUNED
 add y 1
 [Input(8), Unknown(77), Unknown(79), Unknown(73)]
+[Input(8), Exact(1), Exact(26), Unknown(73)]  <-veq
 [(1, 9), (1, 1), (26, 26), (112, 5775684)]
+[(1, 9), (1, 1), (26, 26), (112, 5775684)]  <-veq
 mul z y
 [Input(8), Unknown(77), Unknown(79), Unknown(80)]
+[Input(8), Exact(1), Exact(26), Unknown(80)]  <-veq
 [(1, 9), (1, 1), (26, 26), (2912, 150167784)]
+[(1, 9), (1, 1), (26, 26), (2912, 150167784)]  <-veq
 mul y 0
 [Input(8), Unknown(77), Exact(0), Unknown(80)]
+[Input(8), Exact(1), Exact(0), Unknown(80)]  <-veq
 [(1, 9), (1, 1), (0, 0), (2912, 150167784)]
+[(1, 9), (1, 1), (0, 0), (2912, 150167784)]  <-veq
 add y w
 [Input(8), Unknown(77), Input(8), Unknown(80)]
+[Input(8), Exact(1), Input(8), Unknown(80)]  <-veq
 [(1, 9), (1, 1), (1, 9), (2912, 150167784)]
+[(1, 9), (1, 1), (1, 9), (2912, 150167784)]  <-veq
 add y 6
 [Input(8), Unknown(77), Unknown(81), Unknown(80)]
+[Input(8), Exact(1), Unknown(81), Unknown(80)]  <-veq
 [(1, 9), (1, 1), (7, 15), (2912, 150167784)]
+[(1, 9), (1, 1), (7, 15), (2912, 150167784)]  <-veq
 mul y x
 [Input(8), Unknown(77), Unknown(82), Unknown(80)]
+[Input(8), Exact(1), Unknown(81), Unknown(80)]  <-veq
 [(1, 9), (1, 1), (7, 15), (2912, 150167784)]
+[(1, 9), (1, 1), (7, 15), (2912, 150167784)]  <-veq
+  --> PRUNED
 add z y
 [Input(8), Unknown(77), Unknown(82), Unknown(83)]
+[Input(8), Exact(1), Unknown(81), Unknown(83)]  <-veq
 [(1, 9), (1, 1), (7, 15), (2919, 150167799)]
+[(1, 9), (1, 1), (7, 15), (2919, 150167799)]  <-veq
 inp w
 [Input(9), Unknown(77), Unknown(82), Unknown(83)]
+[Input(9), Exact(1), Unknown(81), Unknown(83)]  <-veq
 [(1, 9), (1, 1), (7, 15), (2919, 150167799)]
+[(1, 9), (1, 1), (7, 15), (2919, 150167799)]  <-veq
 mul x 0
 [Input(9), Exact(0), Unknown(82), Unknown(83)]
+[Input(9), Exact(0), Unknown(81), Unknown(83)]  <-veq
 [(1, 9), (0, 0), (7, 15), (2919, 150167799)]
+[(1, 9), (0, 0), (7, 15), (2919, 150167799)]  <-veq
 add x z
 [Input(9), Unknown(83), Unknown(82), Unknown(83)]
+[Input(9), Unknown(83), Unknown(81), Unknown(83)]  <-veq
 [(1, 9), (2919, 150167799), (7, 15), (2919, 150167799)]
+[(1, 9), (2919, 150167799), (7, 15), (2919, 150167799)]  <-veq
 mod x 26
 [Input(9), Unknown(84), Unknown(82), Unknown(83)]
+[Input(9), Unknown(84), Unknown(81), Unknown(83)]  <-veq
 [(1, 9), (0, 25), (7, 15), (2919, 150167799)]
+[(1, 9), (0, 25), (7, 15), (2919, 150167799)]  <-veq
 div z 26
 [Input(9), Unknown(84), Unknown(82), Unknown(85)]
+[Input(9), Unknown(84), Unknown(81), Unknown(85)]  <-veq
 [(1, 9), (0, 25), (7, 15), (112, 5775684)]
+[(1, 9), (0, 25), (7, 15), (112, 5775684)]  <-veq
 add x -11
 [Input(9), Unknown(86), Unknown(82), Unknown(85)]
+[Input(9), Unknown(86), Unknown(81), Unknown(85)]  <-veq
 [(1, 9), (-11, 14), (7, 15), (112, 5775684)]
+[(1, 9), (-11, 14), (7, 15), (112, 5775684)]  <-veq
 eql x w
 [Input(9), Unknown(87), Unknown(82), Unknown(85)]
+[Input(9), Unknown(87), Unknown(81), Unknown(85)]  <-veq
 [(1, 9), (0, 1), (7, 15), (112, 5775684)]
+[(1, 9), (0, 1), (7, 15), (112, 5775684)]  <-veq
 eql x 0
 [Input(9), Unknown(88), Unknown(82), Unknown(85)]
+[Input(9), Unknown(88), Unknown(81), Unknown(85)]  <-veq
 [(1, 9), (0, 1), (7, 15), (112, 5775684)]
+[(1, 9), (0, 1), (7, 15), (112, 5775684)]  <-veq
 mul y 0
 [Input(9), Unknown(88), Exact(0), Unknown(85)]
+[Input(9), Unknown(88), Exact(0), Unknown(85)]  <-veq
 [(1, 9), (0, 1), (0, 0), (112, 5775684)]
+[(1, 9), (0, 1), (0, 0), (112, 5775684)]  <-veq
 add y 25
 [Input(9), Unknown(88), Exact(25), Unknown(85)]
+[Input(9), Unknown(88), Exact(25), Unknown(85)]  <-veq
 [(1, 9), (0, 1), (25, 25), (112, 5775684)]
+[(1, 9), (0, 1), (25, 25), (112, 5775684)]  <-veq
 mul y x
 [Input(9), Unknown(88), Unknown(89), Unknown(85)]
+[Input(9), Unknown(88), Unknown(89), Unknown(85)]  <-veq
 [(1, 9), (0, 1), (0, 25), (112, 5775684)]
+[(1, 9), (0, 1), (0, 25), (112, 5775684)]  <-veq
 add y 1
 [Input(9), Unknown(88), Unknown(90), Unknown(85)]
+[Input(9), Unknown(88), Unknown(90), Unknown(85)]  <-veq
 [(1, 9), (0, 1), (1, 26), (112, 5775684)]
+[(1, 9), (0, 1), (1, 26), (112, 5775684)]  <-veq
 mul z y
 [Input(9), Unknown(88), Unknown(90), Unknown(91)]
+[Input(9), Unknown(88), Unknown(90), Unknown(91)]  <-veq
 [(1, 9), (0, 1), (1, 26), (112, 150167784)]
+[(1, 9), (0, 1), (1, 26), (112, 150167784)]  <-veq
 mul y 0
 [Input(9), Unknown(88), Exact(0), Unknown(91)]
+[Input(9), Unknown(88), Exact(0), Unknown(91)]  <-veq
 [(1, 9), (0, 1), (0, 0), (112, 150167784)]
+[(1, 9), (0, 1), (0, 0), (112, 150167784)]  <-veq
 add y w
 [Input(9), Unknown(88), Input(9), Unknown(91)]
+[Input(9), Unknown(88), Input(9), Unknown(91)]  <-veq
 [(1, 9), (0, 1), (1, 9), (112, 150167784)]
+[(1, 9), (0, 1), (1, 9), (112, 150167784)]  <-veq
 add y 4
 [Input(9), Unknown(88), Unknown(92), Unknown(91)]
+[Input(9), Unknown(88), Unknown(92), Unknown(91)]  <-veq
 [(1, 9), (0, 1), (5, 13), (112, 150167784)]
+[(1, 9), (0, 1), (5, 13), (112, 150167784)]  <-veq
 mul y x
 [Input(9), Unknown(88), Unknown(93), Unknown(91)]
+[Input(9), Unknown(88), Unknown(93), Unknown(91)]  <-veq
 [(1, 9), (0, 1), (0, 13), (112, 150167784)]
+[(1, 9), (0, 1), (0, 13), (112, 150167784)]  <-veq
 add z y
 [Input(9), Unknown(88), Unknown(93), Unknown(94)]
+[Input(9), Unknown(88), Unknown(93), Unknown(94)]  <-veq
 [(1, 9), (0, 1), (0, 13), (112, 150167797)]
+[(1, 9), (0, 1), (0, 13), (112, 150167797)]  <-veq
 inp w
 [Input(10), Unknown(88), Unknown(93), Unknown(94)]
+[Input(10), Unknown(88), Unknown(93), Unknown(94)]  <-veq
 [(1, 9), (0, 1), (0, 13), (112, 150167797)]
+[(1, 9), (0, 1), (0, 13), (112, 150167797)]  <-veq
 mul x 0
 [Input(10), Exact(0), Unknown(93), Unknown(94)]
+[Input(10), Exact(0), Unknown(93), Unknown(94)]  <-veq
 [(1, 9), (0, 0), (0, 13), (112, 150167797)]
+[(1, 9), (0, 0), (0, 13), (112, 150167797)]  <-veq
 add x z
 [Input(10), Unknown(94), Unknown(93), Unknown(94)]
+[Input(10), Unknown(94), Unknown(93), Unknown(94)]  <-veq
 [(1, 9), (112, 150167797), (0, 13), (112, 150167797)]
+[(1, 9), (112, 150167797), (0, 13), (112, 150167797)]  <-veq
 mod x 26
 [Input(10), Unknown(95), Unknown(93), Unknown(94)]
+[Input(10), Unknown(95), Unknown(93), Unknown(94)]  <-veq
 [(1, 9), (0, 25), (0, 13), (112, 150167797)]
+[(1, 9), (0, 25), (0, 13), (112, 150167797)]  <-veq
 div z 1
 [Input(10), Unknown(95), Unknown(93), Unknown(94)]
+[Input(10), Unknown(95), Unknown(93), Unknown(94)]  <-veq
 [(1, 9), (0, 25), (0, 13), (112, 150167797)]
+[(1, 9), (0, 25), (0, 13), (112, 150167797)]  <-veq
   --> PRUNED
 add x 12
 [Input(10), Unknown(96), Unknown(93), Unknown(94)]
+[Input(10), Unknown(96), Unknown(93), Unknown(94)]  <-veq
 [(1, 9), (12, 37), (0, 13), (112, 150167797)]
+[(1, 9), (12, 37), (0, 13), (112, 150167797)]  <-veq
 eql x w
 [Input(10), Unknown(97), Unknown(93), Unknown(94)]
+[Input(10), Exact(0), Unknown(93), Unknown(94)]  <-veq
 [(1, 9), (0, 0), (0, 13), (112, 150167797)]
+[(1, 9), (0, 0), (0, 13), (112, 150167797)]  <-veq
 eql x 0
 [Input(10), Unknown(98), Unknown(93), Unknown(94)]
+[Input(10), Exact(1), Unknown(93), Unknown(94)]  <-veq
 [(1, 9), (1, 1), (0, 13), (112, 150167797)]
+[(1, 9), (1, 1), (0, 13), (112, 150167797)]  <-veq
 mul y 0
 [Input(10), Unknown(98), Exact(0), Unknown(94)]
+[Input(10), Exact(1), Exact(0), Unknown(94)]  <-veq
 [(1, 9), (1, 1), (0, 0), (112, 150167797)]
+[(1, 9), (1, 1), (0, 0), (112, 150167797)]  <-veq
 add y 25
 [Input(10), Unknown(98), Exact(25), Unknown(94)]
+[Input(10), Exact(1), Exact(25), Unknown(94)]  <-veq
 [(1, 9), (1, 1), (25, 25), (112, 150167797)]
+[(1, 9), (1, 1), (25, 25), (112, 150167797)]  <-veq
 mul y x
 [Input(10), Unknown(98), Unknown(99), Unknown(94)]
+[Input(10), Exact(1), Exact(25), Unknown(94)]  <-veq
 [(1, 9), (1, 1), (25, 25), (112, 150167797)]
+[(1, 9), (1, 1), (25, 25), (112, 150167797)]  <-veq
+  --> PRUNED
 add y 1
 [Input(10), Unknown(98), Unknown(100), Unknown(94)]
+[Input(10), Exact(1), Exact(26), Unknown(94)]  <-veq
 [(1, 9), (1, 1), (26, 26), (112, 150167797)]
+[(1, 9), (1, 1), (26, 26), (112, 150167797)]  <-veq
 mul z y
 [Input(10), Unknown(98), Unknown(100), Unknown(101)]
+[Input(10), Exact(1), Exact(26), Unknown(101)]  <-veq
 [(1, 9), (1, 1), (26, 26), (2912, 3904362722)]
+[(1, 9), (1, 1), (26, 26), (2912, 3904362722)]  <-veq
 mul y 0
 [Input(10), Unknown(98), Exact(0), Unknown(101)]
+[Input(10), Exact(1), Exact(0), Unknown(101)]  <-veq
 [(1, 9), (1, 1), (0, 0), (2912, 3904362722)]
+[(1, 9), (1, 1), (0, 0), (2912, 3904362722)]  <-veq
 add y w
 [Input(10), Unknown(98), Input(10), Unknown(101)]
+[Input(10), Exact(1), Input(10), Unknown(101)]  <-veq
 [(1, 9), (1, 1), (1, 9), (2912, 3904362722)]
+[(1, 9), (1, 1), (1, 9), (2912, 3904362722)]  <-veq
 add y 0
 [Input(10), Unknown(98), Input(10), Unknown(101)]
+[Input(10), Exact(1), Input(10), Unknown(101)]  <-veq
 [(1, 9), (1, 1), (1, 9), (2912, 3904362722)]
+[(1, 9), (1, 1), (1, 9), (2912, 3904362722)]  <-veq
   --> PRUNED
 mul y x
 [Input(10), Unknown(98), Unknown(102), Unknown(101)]
+[Input(10), Exact(1), Input(10), Unknown(101)]  <-veq
 [(1, 9), (1, 1), (1, 9), (2912, 3904362722)]
+[(1, 9), (1, 1), (1, 9), (2912, 3904362722)]  <-veq
+  --> PRUNED
 add z y
 [Input(10), Unknown(98), Unknown(102), Unknown(103)]
+[Input(10), Exact(1), Input(10), Unknown(103)]  <-veq
 [(1, 9), (1, 1), (1, 9), (2913, 3904362731)]
+[(1, 9), (1, 1), (1, 9), (2913, 3904362731)]  <-veq
 inp w
 [Input(11), Unknown(98), Unknown(102), Unknown(103)]
+[Input(11), Exact(1), Input(10), Unknown(103)]  <-veq
 [(1, 9), (1, 1), (1, 9), (2913, 3904362731)]
+[(1, 9), (1, 1), (1, 9), (2913, 3904362731)]  <-veq
 mul x 0
 [Input(11), Exact(0), Unknown(102), Unknown(103)]
+[Input(11), Exact(0), Input(10), Unknown(103)]  <-veq
 [(1, 9), (0, 0), (1, 9), (2913, 3904362731)]
+[(1, 9), (0, 0), (1, 9), (2913, 3904362731)]  <-veq
 add x z
 [Input(11), Unknown(103), Unknown(102), Unknown(103)]
+[Input(11), Unknown(103), Input(10), Unknown(103)]  <-veq
 [(1, 9), (2913, 3904362731), (1, 9), (2913, 3904362731)]
+[(1, 9), (2913, 3904362731), (1, 9), (2913, 3904362731)]  <-veq
 mod x 26
 [Input(11), Unknown(104), Unknown(102), Unknown(103)]
+[Input(11), Unknown(104), Input(10), Unknown(103)]  <-veq
 [(1, 9), (0, 25), (1, 9), (2913, 3904362731)]
+[(1, 9), (0, 25), (1, 9), (2913, 3904362731)]  <-veq
 div z 26
 [Input(11), Unknown(104), Unknown(102), Unknown(105)]
+[Input(11), Unknown(104), Input(10), Unknown(105)]  <-veq
 [(1, 9), (0, 25), (1, 9), (112, 150167797)]
+[(1, 9), (0, 25), (1, 9), (112, 150167797)]  <-veq
 add x -1
 [Input(11), Unknown(106), Unknown(102), Unknown(105)]
+[Input(11), Unknown(106), Input(10), Unknown(105)]  <-veq
 [(1, 9), (-1, 24), (1, 9), (112, 150167797)]
+[(1, 9), (-1, 24), (1, 9), (112, 150167797)]  <-veq
 eql x w
 [Input(11), Unknown(107), Unknown(102), Unknown(105)]
+[Input(11), Unknown(107), Input(10), Unknown(105)]  <-veq
 [(1, 9), (0, 1), (1, 9), (112, 150167797)]
+[(1, 9), (0, 1), (1, 9), (112, 150167797)]  <-veq
 eql x 0
 [Input(11), Unknown(108), Unknown(102), Unknown(105)]
+[Input(11), Unknown(108), Input(10), Unknown(105)]  <-veq
 [(1, 9), (0, 1), (1, 9), (112, 150167797)]
+[(1, 9), (0, 1), (1, 9), (112, 150167797)]  <-veq
 mul y 0
 [Input(11), Unknown(108), Exact(0), Unknown(105)]
+[Input(11), Unknown(108), Exact(0), Unknown(105)]  <-veq
 [(1, 9), (0, 1), (0, 0), (112, 150167797)]
+[(1, 9), (0, 1), (0, 0), (112, 150167797)]  <-veq
 add y 25
 [Input(11), Unknown(108), Exact(25), Unknown(105)]
+[Input(11), Unknown(108), Exact(25), Unknown(105)]  <-veq
 [(1, 9), (0, 1), (25, 25), (112, 150167797)]
+[(1, 9), (0, 1), (25, 25), (112, 150167797)]  <-veq
 mul y x
 [Input(11), Unknown(108), Unknown(109), Unknown(105)]
+[Input(11), Unknown(108), Unknown(109), Unknown(105)]  <-veq
 [(1, 9), (0, 1), (0, 25), (112, 150167797)]
+[(1, 9), (0, 1), (0, 25), (112, 150167797)]  <-veq
 add y 1
 [Input(11), Unknown(108), Unknown(110), Unknown(105)]
+[Input(11), Unknown(108), Unknown(110), Unknown(105)]  <-veq
 [(1, 9), (0, 1), (1, 26), (112, 150167797)]
+[(1, 9), (0, 1), (1, 26), (112, 150167797)]  <-veq
 mul z y
 [Input(11), Unknown(108), Unknown(110), Unknown(111)]
+[Input(11), Unknown(108), Unknown(110), Unknown(111)]  <-veq
 [(1, 9), (0, 1), (1, 26), (112, 3904362722)]
+[(1, 9), (0, 1), (1, 26), (112, 3904362722)]  <-veq
 mul y 0
 [Input(11), Unknown(108), Exact(0), Unknown(111)]
+[Input(11), Unknown(108), Exact(0), Unknown(111)]  <-veq
 [(1, 9), (0, 1), (0, 0), (112, 3904362722)]
+[(1, 9), (0, 1), (0, 0), (112, 3904362722)]  <-veq
 add y w
 [Input(11), Unknown(108), Input(11), Unknown(111)]
+[Input(11), Unknown(108), Input(11), Unknown(111)]  <-veq
 [(1, 9), (0, 1), (1, 9), (112, 3904362722)]
+[(1, 9), (0, 1), (1, 9), (112, 3904362722)]  <-veq
 add y 7
 [Input(11), Unknown(108), Unknown(112), Unknown(111)]
+[Input(11), Unknown(108), Unknown(112), Unknown(111)]  <-veq
 [(1, 9), (0, 1), (8, 16), (112, 3904362722)]
+[(1, 9), (0, 1), (8, 16), (112, 3904362722)]  <-veq
 mul y x
 [Input(11), Unknown(108), Unknown(113), Unknown(111)]
+[Input(11), Unknown(108), Unknown(113), Unknown(111)]  <-veq
 [(1, 9), (0, 1), (0, 16), (112, 3904362722)]
+[(1, 9), (0, 1), (0, 16), (112, 3904362722)]  <-veq
 add z y
 [Input(11), Unknown(108), Unknown(113), Unknown(114)]
+[Input(11), Unknown(108), Unknown(113), Unknown(114)]  <-veq
 [(1, 9), (0, 1), (0, 16), (112, 3904362738)]
+[(1, 9), (0, 1), (0, 16), (112, 3904362738)]  <-veq
 inp w
 [Input(12), Unknown(108), Unknown(113), Unknown(114)]
+[Input(12), Unknown(108), Unknown(113), Unknown(114)]  <-veq
 [(1, 9), (0, 1), (0, 16), (112, 3904362738)]
+[(1, 9), (0, 1), (0, 16), (112, 3904362738)]  <-veq
 mul x 0
 [Input(12), Exact(0), Unknown(113), Unknown(114)]
+[Input(12), Exact(0), Unknown(113), Unknown(114)]  <-veq
 [(1, 9), (0, 0), (0, 16), (112, 3904362738)]
+[(1, 9), (0, 0), (0, 16), (112, 3904362738)]  <-veq
 add x z
 [Input(12), Unknown(114), Unknown(113), Unknown(114)]
+[Input(12), Unknown(114), Unknown(113), Unknown(114)]  <-veq
 [(1, 9), (112, 3904362738), (0, 16), (112, 3904362738)]
+[(1, 9), (112, 3904362738), (0, 16), (112, 3904362738)]  <-veq
 mod x 26
 [Input(12), Unknown(115), Unknown(113), Unknown(114)]
+[Input(12), Unknown(115), Unknown(113), Unknown(114)]  <-veq
 [(1, 9), (0, 25), (0, 16), (112, 3904362738)]
+[(1, 9), (0, 25), (0, 16), (112, 3904362738)]  <-veq
 div z 26
 [Input(12), Unknown(115), Unknown(113), Unknown(116)]
+[Input(12), Unknown(115), Unknown(113), Unknown(116)]  <-veq
 [(1, 9), (0, 25), (0, 16), (4, 150167797)]
+[(1, 9), (0, 25), (0, 16), (4, 150167797)]  <-veq
 add x 0
 [Input(12), Unknown(115), Unknown(113), Unknown(116)]
+[Input(12), Unknown(115), Unknown(113), Unknown(116)]  <-veq
 [(1, 9), (0, 25), (0, 16), (4, 150167797)]
+[(1, 9), (0, 25), (0, 16), (4, 150167797)]  <-veq
   --> PRUNED
 eql x w
 [Input(12), Unknown(117), Unknown(113), Unknown(116)]
+[Input(12), Unknown(117), Unknown(113), Unknown(116)]  <-veq
 [(1, 9), (0, 1), (0, 16), (4, 150167797)]
+[(1, 9), (0, 1), (0, 16), (4, 150167797)]  <-veq
 eql x 0
 [Input(12), Unknown(118), Unknown(113), Unknown(116)]
+[Input(12), Unknown(118), Unknown(113), Unknown(116)]  <-veq
 [(1, 9), (0, 1), (0, 16), (4, 150167797)]
+[(1, 9), (0, 1), (0, 16), (4, 150167797)]  <-veq
 mul y 0
 [Input(12), Unknown(118), Exact(0), Unknown(116)]
+[Input(12), Unknown(118), Exact(0), Unknown(116)]  <-veq
 [(1, 9), (0, 1), (0, 0), (4, 150167797)]
+[(1, 9), (0, 1), (0, 0), (4, 150167797)]  <-veq
 add y 25
 [Input(12), Unknown(118), Exact(25), Unknown(116)]
+[Input(12), Unknown(118), Exact(25), Unknown(116)]  <-veq
 [(1, 9), (0, 1), (25, 25), (4, 150167797)]
+[(1, 9), (0, 1), (25, 25), (4, 150167797)]  <-veq
 mul y x
 [Input(12), Unknown(118), Unknown(119), Unknown(116)]
+[Input(12), Unknown(118), Unknown(119), Unknown(116)]  <-veq
 [(1, 9), (0, 1), (0, 25), (4, 150167797)]
+[(1, 9), (0, 1), (0, 25), (4, 150167797)]  <-veq
 add y 1
 [Input(12), Unknown(118), Unknown(120), Unknown(116)]
+[Input(12), Unknown(118), Unknown(120), Unknown(116)]  <-veq
 [(1, 9), (0, 1), (1, 26), (4, 150167797)]
+[(1, 9), (0, 1), (1, 26), (4, 150167797)]  <-veq
 mul z y
 [Input(12), Unknown(118), Unknown(120), Unknown(121)]
+[Input(12), Unknown(118), Unknown(120), Unknown(121)]  <-veq
 [(1, 9), (0, 1), (1, 26), (4, 3904362722)]
+[(1, 9), (0, 1), (1, 26), (4, 3904362722)]  <-veq
 mul y 0
 [Input(12), Unknown(118), Exact(0), Unknown(121)]
+[Input(12), Unknown(118), Exact(0), Unknown(121)]  <-veq
 [(1, 9), (0, 1), (0, 0), (4, 3904362722)]
+[(1, 9), (0, 1), (0, 0), (4, 3904362722)]  <-veq
 add y w
 [Input(12), Unknown(118), Input(12), Unknown(121)]
+[Input(12), Unknown(118), Input(12), Unknown(121)]  <-veq
 [(1, 9), (0, 1), (1, 9), (4, 3904362722)]
+[(1, 9), (0, 1), (1, 9), (4, 3904362722)]  <-veq
 add y 12
 [Input(12), Unknown(118), Unknown(122), Unknown(121)]
+[Input(12), Unknown(118), Unknown(122), Unknown(121)]  <-veq
 [(1, 9), (0, 1), (13, 21), (4, 3904362722)]
+[(1, 9), (0, 1), (13, 21), (4, 3904362722)]  <-veq
 mul y x
 [Input(12), Unknown(118), Unknown(123), Unknown(121)]
+[Input(12), Unknown(118), Unknown(123), Unknown(121)]  <-veq
 [(1, 9), (0, 1), (0, 21), (4, 3904362722)]
+[(1, 9), (0, 1), (0, 21), (4, 3904362722)]  <-veq
 add z y
 [Input(12), Unknown(118), Unknown(123), Unknown(124)]
+[Input(12), Unknown(118), Unknown(123), Unknown(124)]  <-veq
 [(1, 9), (0, 1), (0, 21), (4, 3904362743)]
+[(1, 9), (0, 1), (0, 21), (4, 3904362743)]  <-veq
 inp w
 [Input(13), Unknown(118), Unknown(123), Unknown(124)]
+[Input(13), Unknown(118), Unknown(123), Unknown(124)]  <-veq
 [(1, 9), (0, 1), (0, 21), (4, 3904362743)]
+[(1, 9), (0, 1), (0, 21), (4, 3904362743)]  <-veq
 mul x 0
 [Input(13), Exact(0), Unknown(123), Unknown(124)]
+[Input(13), Exact(0), Unknown(123), Unknown(124)]  <-veq
 [(1, 9), (0, 0), (0, 21), (4, 3904362743)]
+[(1, 9), (0, 0), (0, 21), (4, 3904362743)]  <-veq
 add x z
 [Input(13), Unknown(124), Unknown(123), Unknown(124)]
+[Input(13), Unknown(124), Unknown(123), Unknown(124)]  <-veq
 [(1, 9), (4, 3904362743), (0, 21), (4, 3904362743)]
+[(1, 9), (4, 3904362743), (0, 21), (4, 3904362743)]  <-veq
 mod x 26
 [Input(13), Unknown(125), Unknown(123), Unknown(124)]
+[Input(13), Unknown(125), Unknown(123), Unknown(124)]  <-veq
 [(1, 9), (0, 25), (0, 21), (4, 3904362743)]
+[(1, 9), (0, 25), (0, 21), (4, 3904362743)]  <-veq
 div z 26
 [Input(13), Unknown(125), Unknown(123), Unknown(126)]
+[Input(13), Unknown(125), Unknown(123), Unknown(126)]  <-veq
 [(1, 9), (0, 25), (0, 21), (0, 150167797)]
+[(1, 9), (0, 25), (0, 21), (0, 150167797)]  <-veq
 add x -11
 [Input(13), Unknown(127), Unknown(123), Unknown(126)]
+[Input(13), Unknown(127), Unknown(123), Unknown(126)]  <-veq
 [(1, 9), (-11, 14), (0, 21), (0, 150167797)]
+[(1, 9), (-11, 14), (0, 21), (0, 150167797)]  <-veq
 eql x w
 [Input(13), Unknown(128), Unknown(123), Unknown(126)]
+[Input(13), Unknown(128), Unknown(123), Unknown(126)]  <-veq
 [(1, 9), (0, 1), (0, 21), (0, 150167797)]
+[(1, 9), (0, 1), (0, 21), (0, 150167797)]  <-veq
 eql x 0
 [Input(13), Unknown(129), Unknown(123), Unknown(126)]
+[Input(13), Unknown(129), Unknown(123), Unknown(126)]  <-veq
 [(1, 9), (0, 1), (0, 21), (0, 150167797)]
+[(1, 9), (0, 1), (0, 21), (0, 150167797)]  <-veq
 mul y 0
 [Input(13), Unknown(129), Exact(0), Unknown(126)]
+[Input(13), Unknown(129), Exact(0), Unknown(126)]  <-veq
 [(1, 9), (0, 1), (0, 0), (0, 150167797)]
+[(1, 9), (0, 1), (0, 0), (0, 150167797)]  <-veq
 add y 25
 [Input(13), Unknown(129), Exact(25), Unknown(126)]
+[Input(13), Unknown(129), Exact(25), Unknown(126)]  <-veq
 [(1, 9), (0, 1), (25, 25), (0, 150167797)]
+[(1, 9), (0, 1), (25, 25), (0, 150167797)]  <-veq
 mul y x
 [Input(13), Unknown(129), Unknown(130), Unknown(126)]
+[Input(13), Unknown(129), Unknown(130), Unknown(126)]  <-veq
 [(1, 9), (0, 1), (0, 25), (0, 150167797)]
+[(1, 9), (0, 1), (0, 25), (0, 150167797)]  <-veq
 add y 1
 [Input(13), Unknown(129), Unknown(131), Unknown(126)]
+[Input(13), Unknown(129), Unknown(131), Unknown(126)]  <-veq
 [(1, 9), (0, 1), (1, 26), (0, 150167797)]
+[(1, 9), (0, 1), (1, 26), (0, 150167797)]  <-veq
 mul z y
 [Input(13), Unknown(129), Unknown(131), Unknown(132)]
+[Input(13), Unknown(129), Unknown(131), Unknown(132)]  <-veq
 [(1, 9), (0, 1), (1, 26), (0, 0)]
+[(1, 9), (0, 1), (1, 26), (0, 0)]  <-veq
 mul y 0
 [Input(13), Unknown(129), Exact(0), Unknown(132)]
+[Input(13), Unknown(129), Exact(0), Unknown(132)]  <-veq
 [(1, 9), (0, 1), (0, 0), (0, 0)]
+[(1, 9), (0, 1), (0, 0), (0, 0)]  <-veq
 add y w
 [Input(13), Unknown(129), Input(13), Unknown(132)]
+[Input(13), Unknown(129), Input(13), Unknown(132)]  <-veq
 [(1, 9), (0, 1), (1, 9), (0, 0)]
+[(1, 9), (0, 1), (1, 9), (0, 0)]  <-veq
 add y 1
 [Input(13), Unknown(129), Unknown(133), Unknown(132)]
+[Input(13), Unknown(129), Unknown(133), Unknown(132)]  <-veq
 [(1, 9), (0, 1), (2, 10), (0, 0)]
+[(1, 9), (0, 1), (2, 10), (0, 0)]  <-veq
 mul y x
 [Input(13), Unknown(129), Unknown(134), Unknown(132)]
+[Input(13), Unknown(129), Unknown(134), Unknown(132)]  <-veq
 [(1, 9), (0, 1), (0, 0), (0, 0)]
+[(1, 9), (0, 1), (0, 0), (0, 0)]  <-veq
 add z y
 [Input(13), Unknown(129), Unknown(134), Unknown(135)]
+[Input(13), Unknown(129), Unknown(134), Exact(0)]  <-veq
 [(1, 9), (0, 1), (0, 0), (0, 0)]
+[(1, 9), (0, 1), (0, 0), (0, 0)]  <-veq
 
 input deps:
 {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13}
 
 
 value deps:
-{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134}
+{0, 7, 8, 10, 17, 18, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 38, 39, 41, 48, 49, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 80, 81, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 101, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134}
 
 value 135: (0, 0)
 value 134: (0, 0)
 value 132: (0, 0)
 
 dead values:
-{}
+{1, 2, 3, 4, 5, 6, 9, 11, 12, 13, 14, 15, 16, 19, 32, 33, 34, 35, 36, 37, 40, 42, 43, 44, 45, 46, 47, 50, 74, 75, 76, 77, 78, 79, 82, 95, 96, 97, 98, 99, 100, 102}
 
 0
