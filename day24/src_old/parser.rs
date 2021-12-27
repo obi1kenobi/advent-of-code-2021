@@ -42,7 +42,7 @@ impl Display for Operand {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum Instruction {
     Input(Register),
     Add(Register, Operand),
