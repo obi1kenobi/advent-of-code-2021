@@ -1,0 +1,26 @@
+mul y x  *pruned: NoOpInputs
+[    N/A: Undefined     |     N/A: Undefined     |  55: Unknown(8..=16)   |    50: Unknown(max)   ]
+add z y
+[    N/A: Undefined     |     N/A: Undefined     |     N/A: Undefined     | 57: Unknown(0..=+inf) ]
+
+The bound on 57 seems surprising, but actually nicely illustrates the value of undefined behavior.
+Consider what happens after this "add z y" instruction:
+
+add z y
+[    N/A: Undefined     |     N/A: Undefined     |     N/A: Undefined     | 57: Unknown(0..=+inf) ]
+inp w
+[  58: Input_2(1..=9)   |     N/A: Undefined     |     N/A: Undefined     | 57: Unknown(0..=+inf) ]
+mul x 0  *pruned: ResultNeverUsed
+[  58: Input_2(1..=9)   |     N/A: Undefined     |     N/A: Undefined     | 57: Unknown(0..=+inf) ]
+add x z  *pruned: ResultNeverUsed
+[  58: Input_2(1..=9)   |     N/A: Undefined     |     N/A: Undefined     | 57: Unknown(0..=+inf) ]
+mod x 26  *pruned: ResultNeverUsed
+[  58: Input_2(1..=9)   |     N/A: Undefined     |     N/A: Undefined     | 57: Unknown(0..=+inf) ]
+
+Value 57 ends up moved into x by the combination "mul x 0; add x z", and is then used in "mod x 26".
+Now, all three of these operations end up pruned away because their results are never used.
+Even so, it would have been illegal (undefined behavior) for "mod x 26" to have a negative number
+for x, since the optimization that removes "mod x 26" isn't required by the language specification.
+
+Therefore, the concept of "undefined behavior" ends up helping the compiler constrain the program
+even though the operation that would cause that undefined behavior isn't part of the final program.
