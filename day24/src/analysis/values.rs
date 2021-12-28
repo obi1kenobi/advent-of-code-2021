@@ -142,7 +142,7 @@ impl Mul<i64> for &ValueRange {
 
     fn mul(self, rhs: i64) -> Self::Output {
         let endpoint_a = self.start().saturating_mul(rhs);
-        let endpoint_b = self.start().saturating_mul(rhs);
+        let endpoint_b = self.end().saturating_mul(rhs);
         Self::Output::new(
             std::cmp::min(endpoint_a, endpoint_b),
             std::cmp::max(endpoint_a, endpoint_b),

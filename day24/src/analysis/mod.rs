@@ -538,13 +538,9 @@ impl Analysis {
                 Instruction::Add(_, _) => Some(source_range + operand_range),
                 Instruction::Mul(_, _) => {
                     if operand_range.is_exact() {
-                        let operand_value = operand_range.start();
-                        let result_a = source_range.start().saturating_mul(operand_value);
-                        let result_b = source_range.end().saturating_mul(operand_value);
-                        Some(ValueRange::new(
-                            std::cmp::min(result_a, result_b),
-                            std::cmp::max(result_a, result_b),
-                        ))
+                        Some(source_range * operand_range.start())
+                    } else if source_range.is_exact() {
+                        Some(operand_range * source_range.start())
                     } else {
                         // TODO: implement me, be very careful with edge cases
                         None
