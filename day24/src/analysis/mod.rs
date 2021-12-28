@@ -5,6 +5,9 @@ use std::{
     ops::Index,
 };
 
+#[allow(unused_imports)]
+use itertools::Itertools;
+
 use crate::parser::{Instruction, Operand, Register};
 
 use self::values::{Value, ValueRange, Vid, VidMaker};
@@ -1106,6 +1109,16 @@ impl Analysis {
         }
 
         self
+    }
+
+    pub fn get_optimized_instructions(self) -> Vec<Instruction> {
+        self.annotated.into_iter().filter_map(|(key, annotated)| {
+            if self.pruned.contains_key(&key) {
+                None
+            } else {
+                Some(annotated.instr)
+            }
+        }).collect()
     }
 }
 

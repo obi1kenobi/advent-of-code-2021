@@ -51,10 +51,9 @@ fn main() {
 }
 
 fn optimize_program(input_program: &[Instruction]) -> Vec<Instruction> {
-    let mut _analysis = analyze_program(input_program);
-    _analysis = finalize_optimization(_analysis);
+    let analysis = analyze_program(input_program);
 
-    todo!("implement removal of pruned instructions")
+    finalize_optimization(analysis).get_optimized_instructions()
 }
 
 fn analyze_program(input_program: &[Instruction]) -> Analysis {
