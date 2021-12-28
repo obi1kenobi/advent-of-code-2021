@@ -68,10 +68,17 @@ pub struct AnnotatedInstr {
     pub state_after: Rsid,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PrunedReason {
+    NoOpArgument,       // e.g. mul x 1
+    NoOpInputRange,     // e.g. mod x 26 if range analysis says x is in 4..=10
+}
+
 #[derive(Debug, Clone)]
 pub struct Analysis {
     pub input_program: BTreeMap<InstrId, Instruction>,
     pub annotated: BTreeMap<InstrId, AnnotatedInstr>,
+    pub pruned: BTreeMap<InstrId, PrunedReason>,
     pub values: BTreeMap<Vid, Value>,
     pub register_states: BTreeMap<Rsid, RegisterState>,
     pub inputs: Vec<Vid>, // the value IDs of all input instructions
@@ -81,7 +88,11 @@ pub struct Analysis {
 impl Display for Analysis {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (instr_id, instr) in &self.input_program {
-            writeln!(f, "{}", instr)?;
+            if let Some(prune_reason) = self.pruned.get(instr_id) {
+                writeln!(f, "{}  *pruned: {:?}", instr, *prune_reason)?;
+            } else {
+                writeln!(f, "{}", instr)?;
+            }
 
             let annotated = &self.annotated[instr_id];
             let registers_after = self.register_states[&annotated.state_after];
@@ -126,6 +137,7 @@ impl From<Vec<Instruction>> for Analysis {
         Self {
             input_program,
             annotated,
+            pruned: Default::default(),
             values,
             register_states,
             inputs,
