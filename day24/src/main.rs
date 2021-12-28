@@ -8,6 +8,7 @@ use itertools::Itertools;
 
 use parser::{parse_program, Instruction};
 
+use crate::analysis::values::ValueRange;
 #[allow(unused_imports)]
 use crate::parser::InstructionStream;
 
@@ -29,6 +30,14 @@ fn main() {
     let input_data: Vec<Instruction> = parse_program(content.as_str());
 
     match part {
+        "optimize" => {
+            let optimized_instrs = optimize_program(&input_data);
+            println!("{}", InstructionStream(&optimized_instrs));
+        }
+        "intermediate" => {
+            let analysis = analyze_program(&input_data);
+            println!("{}", analysis);
+        }
         "1" => {
             let result = solve_part1(&input_data);
             println!("{}", result);
@@ -41,7 +50,14 @@ fn main() {
     }
 }
 
-fn optimize_program(input_program: &[Instruction]) -> Analysis {
+fn optimize_program(input_program: &[Instruction]) -> Vec<Instruction> {
+    let mut _analysis = analyze_program(input_program);
+    _analysis = finalize_optimization(_analysis);
+
+    todo!("implement removal of pruned instructions")
+}
+
+fn analyze_program(input_program: &[Instruction]) -> Analysis {
     let analysis: Analysis = input_program.iter().cloned().collect_vec().into();
 
     let mut current_analysis = analysis.operation_definedness();
@@ -49,7 +65,7 @@ fn optimize_program(input_program: &[Instruction]) -> Analysis {
     // Iterate the next few passes until a fixpoint is found,
     // since the passes create opportunities for each other to optimize further.
     let mut value_ranges = current_analysis.values.clone();
-    current_analysis = loop {
+    loop {
         current_analysis = current_analysis
             .constant_propagation()
             .known_operation_results()
@@ -61,9 +77,14 @@ fn optimize_program(input_program: &[Instruction]) -> Analysis {
         } else {
             value_ranges = current_analysis.values.clone();
         }
-    };
+    }
+}
 
-    current_analysis
+/// These optimization steps make destructive changes to the input program,
+/// such that only a limited set of analysis steps are possible from this point onward.
+/// TODO: Express these limitations in the type of Analysis.
+fn finalize_optimization(analysis: Analysis) -> Analysis {
+    analysis
         // Instruction pruning isn't useful in the early passes, so save it until later.
         .prune_for_no_change_in_registers()
         // Keep this pass near the bottom, since prior analysis passes are not compatible with it.
@@ -73,9 +94,34 @@ fn optimize_program(input_program: &[Instruction]) -> Analysis {
 
 #[allow(unused_variables)]
 fn solve_part1(data: &[Instruction]) -> u64 {
-    let optimized_program = optimize_program(data);
+    let mut current_analysis = analyze_program(data);
 
-    println!("{}", optimized_program);
+    // Update the analysis with the information that the last z register value is 0.
+    let last_z_register_id = current_analysis.register_states.values().last().unwrap().registers.last().unwrap();
+    current_analysis.values.narrow_value_range(*last_z_register_id, &ValueRange::new_exact(0));
+
+    // Back-propagate the z=0 information up through the rest of the range information.
+    current_analysis = current_analysis.backward_value_range_analysis();
+
+    // Iterate the next few passes until a fixpoint is found,
+    // since the passes create opportunities for each other to optimize further.
+    let mut value_ranges = current_analysis.values.clone();
+    current_analysis = loop {
+        current_analysis = current_analysis
+            .constant_propagation()
+            .known_operation_results()
+            .forward_value_range_analysis()
+            .backward_value_range_analysis()
+            .matched_mul_and_div_or_mod();
+
+        if current_analysis.values == value_ranges {
+            break current_analysis;
+        } else {
+            value_ranges = current_analysis.values.clone();
+        }
+    };
+
+    println!("{}", current_analysis);
 
     0
 }

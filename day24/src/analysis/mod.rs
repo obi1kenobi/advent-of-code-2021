@@ -9,7 +9,7 @@ use crate::parser::{Instruction, Operand, Register};
 
 use self::values::{Value, ValueRange, Vid, VidMaker};
 
-mod values;
+pub mod values;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct InstrId(pub usize);
@@ -46,7 +46,7 @@ impl Iterator for RsidMaker {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RegisterState {
-    registers: [Vid; 4],
+    pub registers: [Vid; 4],
 }
 
 impl RegisterState {
@@ -90,11 +90,6 @@ impl ValueRangeAnalysis {
     }
 
     #[inline]
-    pub fn get(&self, vid: &Vid) -> Option<&Value> {
-        self.0.get(vid)
-    }
-
-    #[inline]
     pub fn try_insert(
         &mut self,
         vid: Vid,
@@ -103,6 +98,7 @@ impl ValueRangeAnalysis {
         self.0.try_insert(vid, value)
     }
 
+    #[allow(dead_code)]
     #[inline]
     pub fn insert(&mut self, vid: Vid, value: Value) -> Option<Value> {
         self.0.insert(vid, value)
@@ -564,6 +560,183 @@ impl Analysis {
             };
             if let Some(result_range) = result_range {
                 self.values.narrow_value_range(result_vid, &result_range);
+            }
+        }
+
+        self
+    }
+
+    pub fn backward_value_range_analysis(mut self) -> Self {
+        for ann_instr in self.annotated.values().rev() {
+            if matches!(ann_instr.instr, Instruction::Input(_)) {
+                continue;
+            }
+
+            let source_vid = ann_instr.source;
+            let operand_vid = ann_instr.operand;
+            let result_vid = ann_instr.result;
+
+            let mut source_range = self.values[&source_vid].range();
+            let mut operand_range = self.values[&operand_vid].range();
+            let mut result_range = self.values[&result_vid].range();
+
+            match ann_instr.instr {
+                Instruction::Input(_) => unreachable!(),
+                Instruction::Add(_, _) => {
+                    loop {
+                        let next_source = self
+                            .values
+                            .narrow_value_range(source_vid, &(&result_range - &operand_range));
+                        let next_operand = self
+                            .values
+                            .narrow_value_range(operand_vid, &(&result_range - &next_source));
+                        let next_result = self
+                            .values
+                            .narrow_value_range(result_vid, &(&next_source + &next_operand));
+
+                        if source_range == next_source
+                            && operand_range == next_operand
+                            && result_range == next_result
+                        {
+                            // Fixpoint found.
+                            break;
+                        }
+
+                        source_range = self.values[&source_vid].range();
+                        operand_range = self.values[&operand_vid].range();
+                        result_range = self.values[&result_vid].range();
+                    }
+                }
+                Instruction::Mul(_, _) => {
+                    // The easiest case of backpropagating range information through mul is when
+                    // the result is exactly 0, and only one of the inputs' ranges contains 0.
+                    // In that case, that input must be zero, and the other input gets clobbered
+                    // without being read, and will be eliminated in unused_register_elimination().
+                    if result_range.is_exactly(0) {
+                        let source_contains_zero = source_range.contains(0);
+                        let operand_contains_zero = operand_range.contains(0);
+
+                        match (source_contains_zero, operand_contains_zero) {
+                            (true, true) => {
+                                // At least one of the inputs must be zero but we
+                                // can't tell which one it will be -- it could be either.
+                                // There's no further information to be found here.
+                            }
+                            (true, false) => {
+                                // The source must be zero, since the operand cannot be zero.
+                                self.values.narrow_value_range(source_vid, &ValueRange::new_exact(0));
+                            }
+                            (false, true) => {
+                                // The operand must be zero, since the source cannot be zero.
+                                self.values.narrow_value_range(operand_vid, &ValueRange::new_exact(0));
+                            }
+                            (false, false) => unreachable!(),
+                        }
+                    }
+                }
+                Instruction::Div(_, _) => {
+                    // The Advent of Code challenge input only contains divisions
+                    // by a literal value, and never divides one register by another.
+                    //
+                    // We can implement the easy "exact divisor" division range propagation,
+                    // and let the more complex "divisor range" case claim "no information" about
+                    // the range of the inputs.
+                    if operand_range.is_exact() {
+                        let result_range = &self.values[&result_vid].range();
+                        let divisor = operand_range.start();
+                        if divisor == i64::MIN {
+                            // The complicated overflow situations here, and the unlikelihood
+                            // of this case being useful at all make it not worth implementing.
+                            continue;
+                        } else {
+                            let multiplied_range = result_range * divisor;
+
+                            // We are safe from under/overflows since:
+                            // - only i64::MIN would overflow at abs()
+                            // - the abs() result is positive so the -1 won't underflow.
+                            let max_non_truncated_value = divisor.abs() - 1;
+
+                            // Account for possible truncation on either side.
+                            let final_range = ValueRange::new(
+                                multiplied_range.start().saturating_sub(max_non_truncated_value),
+                                multiplied_range.end().saturating_add(max_non_truncated_value),
+                            );
+                            self.values.narrow_value_range(source_vid, &final_range);
+                        }
+                    }
+                }
+                Instruction::Mod(_, _) => {
+                    // The only case where we can backpropagate information through a mod
+                    // is if the source range is known to always be within (0, operand - 1)
+                    // for the lowest possible value of the mod operand.
+                    //
+                    // However, in that case we know the mod is a complete no-op, and that
+                    // is already handled by the known operation results pass.
+                }
+                Instruction::Equal(_, _) => {
+                    if result_range.is_exactly(0) {
+                        // The inputs are known non-equal. If either input value has an exact range,
+                        // then that specific value may be excluded from the other input's range.
+                        // Because of our range representation, we can only exclude values
+                        // at the range endpoints.
+                        loop {
+                            let source_range = self.values[&source_vid].range();
+                            let operand_range = self.values[&operand_vid].range();
+                            let mut next_operand_range = operand_range.clone();
+                            let mut next_source_range = source_range.clone();
+
+                            let tuples = [
+                                (
+                                    &source_range,
+                                    &operand_range,
+                                    operand_vid,
+                                    &mut next_operand_range,
+                                ),
+                                (
+                                    &operand_range,
+                                    &source_range,
+                                    source_vid,
+                                    &mut next_source_range,
+                                ),
+                            ];
+                            for (op_range, target_range, target_vid, next_target_range) in tuples {
+                                if op_range.is_exact() {
+                                    let endpoint = op_range.start();
+                                    if target_range.start() == endpoint {
+                                        *next_target_range = self.values.narrow_value_range(
+                                            target_vid,
+                                            &(ValueRange::new(endpoint + 1, target_range.end())),
+                                        )
+                                    }
+                                    if target_range.end() == endpoint {
+                                        *next_target_range = self.values.narrow_value_range(
+                                            target_vid,
+                                            &(ValueRange::new(target_range.start(), endpoint - 1)),
+                                        )
+                                    }
+                                }
+                            }
+                            if source_range == next_source_range
+                                && operand_range == next_operand_range
+                            {
+                                // Fixpoint reached.
+                                break;
+                            }
+                        }
+                    } else if result_range.is_exactly(1) {
+                        // The inputs are known to be equal, mark the source and operand values
+                        // as equivalent to each other.
+                        self.equivalent_values.update_equivalent_values(
+                            &mut self.values,
+                            source_vid,
+                            operand_vid,
+                        );
+                    } else {
+                        // If the inputs aren't known to be equal or non-equal, then
+                        // there's no information to be extracted here.
+                        continue;
+                    }
+                }
             }
         }
 

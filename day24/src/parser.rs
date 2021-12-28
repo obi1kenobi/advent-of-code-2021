@@ -77,6 +77,8 @@ impl<'a> Display for InstructionStream<'a> {
 }
 
 impl Instruction {
+    #[allow(dead_code)]
+    #[inline]
     pub fn destination(&self) -> Register {
         *match self {
             Instruction::Input(r) => r,
@@ -88,6 +90,7 @@ impl Instruction {
         }
     }
 
+    #[inline]
     pub fn operand(&self) -> Option<Operand> {
         match self {
             Instruction::Input(_) => None,
