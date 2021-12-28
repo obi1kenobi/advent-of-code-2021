@@ -489,6 +489,21 @@ impl Analysis {
 
         self
     }
+
+    // pub fn unused_register_elimination(self) -> Self {
+    //     // Any register whose value gets clobbered without needing to be read first is
+    //     // functionally "dead" and might as well have an undefined value.
+    //     // Example instructions that clobber registers without reading them:
+    //     //   inp x
+    //     //   mul x 0
+    //     // Since this pass leaves registers in the undefined value (which has no range info, etc.),
+    //     // it leaves the Self object in a state where not all other passes can be run anymore.
+    //     // As a result, this should probably be one of the last passes to be executed.
+    //     let register_is_unused = [false; 4];
+    //     for ann_instr in self.annotated.values() {
+
+    //     }
+    // }
 }
 
 fn perform_value_numbering(
