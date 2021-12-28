@@ -56,6 +56,11 @@ impl ValueRange {
     }
 
     #[inline]
+    pub fn is_exactly(&self, value: i64) -> bool {
+        self.range.start() == &value && self.range.end() == &value
+    }
+
+    #[inline]
     pub const fn start(&self) -> i64 {
         *self.range.start()
     }
@@ -132,12 +137,30 @@ impl Sub for &ValueRange {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub enum Value {
     Exact(Vid, i64),
     Input(Vid, usize, ValueRange),  // which input number is it
     Unknown(Vid, ValueRange),
     Undefined,
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Exact(_, l1), Self::Exact(_, r1)) => {
+                // Don't compare value IDs for exact values! Constants are equal by value.
+                l1 == r1
+            }
+            (Self::Input(l0, l1, l2), Self::Input(r0, r1, r2)) => l0 == r0 && l1 == r1 && l2 == r2,
+            (Self::Unknown(l0, l1), Self::Unknown(r0, r1)) => l0 == r0 && l1 == r1,
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
+}
+
+impl Eq for Value {
+    fn assert_receiver_is_total_eq(&self) {}
 }
 
 impl Value {

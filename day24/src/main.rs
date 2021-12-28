@@ -49,6 +49,7 @@ fn optimize_program(input_program: &[Instruction]) -> Analysis {
     analysis
         .constant_propagation()
         .operation_definedness()
+        .known_operation_results()
 }
 
 #[allow(unused_variables)]

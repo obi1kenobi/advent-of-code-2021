@@ -1,4 +1,9 @@
-use std::{cmp::Ordering, collections::BTreeMap, fmt::Display};
+use std::{
+    cmp::Ordering,
+    collections::{btree_map::OccupiedError, BTreeMap},
+    fmt::Display,
+    ops::Index,
+};
 
 use crate::parser::{Instruction, Operand, Register};
 
@@ -70,8 +75,139 @@ pub struct AnnotatedInstr {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PrunedReason {
-    NoOpArgument,       // e.g. mul x 1
-    NoOpInputRange,     // e.g. mod x 26 if range analysis says x is in 4..=10
+    NoOpInputs,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ValueRangeAnalysis(BTreeMap<Vid, Value>);
+
+impl ValueRangeAnalysis {
+    #[inline]
+    pub fn new() -> Self {
+        Self(Default::default())
+    }
+
+    #[inline]
+    pub fn get(&self, vid: &Vid) -> Option<&Value> {
+        self.0.get(vid)
+    }
+
+    #[inline]
+    pub fn try_insert(
+        &mut self,
+        vid: Vid,
+        value: Value,
+    ) -> Result<&mut Value, OccupiedError<Vid, Value>> {
+        self.0.try_insert(vid, value)
+    }
+
+    #[inline]
+    pub fn insert(&mut self, vid: Vid, value: Value) -> Option<Value> {
+        self.0.insert(vid, value)
+    }
+
+    pub fn narrow_value_range(&mut self, vid: Vid, range: &ValueRange) -> ValueRange {
+        let owned_value = self.0.remove(&vid).unwrap();
+        let final_result = owned_value.narrow_range(range);
+        let final_range = final_result.range();
+        self.try_insert(vid, final_result).unwrap();
+        final_range
+    }
+}
+
+impl Index<&Vid> for ValueRangeAnalysis {
+    type Output = Value;
+
+    fn index(&self, index: &Vid) -> &Self::Output {
+        self.0.index(index)
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ValueEquivalenceAnalysis(BTreeMap<Vid, Vid>);
+
+impl ValueEquivalenceAnalysis {
+    #[inline]
+    pub fn new() -> Self {
+        Self(Default::default())
+    }
+
+    fn are_equivalent(&mut self, values: &mut ValueRangeAnalysis, left: Vid, right: Vid) -> bool {
+        let left_equivalent = self.get_equivalent_value(values, left);
+        let right_equivalent = self.get_equivalent_value(values, right);
+
+        if left_equivalent == right_equivalent {
+            true
+        } else {
+            // Not all constants are marked equivalent to each other,
+            // so these values may still be equal to each other. Check their values for equality.
+            values[&left_equivalent] == values[&right_equivalent]
+        }
+    }
+
+    fn get_equivalent_value(&mut self, values: &mut ValueRangeAnalysis, vid: Vid) -> Vid {
+        // Union-find on the equivalent values graph, always pointing toward lower-numbered Vids.
+        let mut current_vid = vid;
+        let mut ancestors = vec![];
+
+        let initial_range = &values[&vid].range();
+        let mut range = initial_range.clone();
+        while let Some(parent) = self.0.get(&current_vid) {
+            assert!(*parent < current_vid); // protect against cycles
+
+            let parent_range = &values[parent].range();
+            range = range.intersect(parent_range).unwrap();
+
+            ancestors.push(current_vid);
+            current_vid = *parent;
+        }
+
+        // Not all the values we came across agreed on the range of possible values.
+        // Shrink all the ranges to match the common intersection across all of them.
+        if initial_range != &range {
+            for ancestor in &ancestors {
+                values.narrow_value_range(*ancestor, &range);
+            }
+        }
+
+        // We skip one element from the back since the last element had the correct parent.
+        // All other elements need to point to this final equivalent value.
+        for ancestor in ancestors.into_iter().rev().skip(1) {
+            self.0.insert(ancestor, current_vid).unwrap();
+        }
+
+        current_vid
+    }
+
+    fn update_equivalent_values(&mut self, values: &mut ValueRangeAnalysis, left: Vid, right: Vid) {
+        if left == right {
+            // No-op.
+            return;
+        }
+
+        // Update the ranges of the values to match each other.
+        let left_range = &values[&left].range();
+        let right_range = &values[&right].range();
+        values.narrow_value_range(left, right_range);
+        values.narrow_value_range(right, left_range);
+
+        // Union-find on the equivalent values graph, always pointing toward lower-numbered Vids.
+        let left_equivalent = self.get_equivalent_value(values, left);
+        let right_equivalent = self.get_equivalent_value(values, right);
+
+        if left_equivalent != right_equivalent {
+            // These values are already known to be equivalent. Nothing further to be done.
+            return;
+        }
+
+        let (lower_vid, higher_vid) = match left_equivalent.cmp(&right_equivalent) {
+            Ordering::Less => (left_equivalent, right_equivalent),
+            Ordering::Greater => (right_equivalent, left_equivalent),
+            Ordering::Equal => unreachable!("{:?} {:?}", left_equivalent, right_equivalent),
+        };
+
+        self.0.insert(higher_vid, lower_vid);
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -79,10 +215,10 @@ pub struct Analysis {
     pub input_program: BTreeMap<InstrId, Instruction>,
     pub annotated: BTreeMap<InstrId, AnnotatedInstr>,
     pub pruned: BTreeMap<InstrId, PrunedReason>,
-    pub values: BTreeMap<Vid, Value>,
+    pub values: ValueRangeAnalysis,
     pub register_states: BTreeMap<Rsid, RegisterState>,
     pub inputs: Vec<Vid>, // the value IDs of all input instructions
-    pub equivalent_values: BTreeMap<Vid, Vid>,
+    pub equivalent_values: ValueEquivalenceAnalysis,
 }
 
 impl Display for Analysis {
@@ -120,7 +256,7 @@ impl From<Vec<Instruction>> for Analysis {
             .collect();
 
         let mut annotated: BTreeMap<InstrId, AnnotatedInstr> = Default::default();
-        let mut values: BTreeMap<Vid, Value> = Default::default();
+        let mut values = ValueRangeAnalysis::new();
         let mut register_states: BTreeMap<Rsid, RegisterState> = Default::default();
         let mut inputs = Default::default();
 
@@ -146,74 +282,7 @@ impl From<Vec<Instruction>> for Analysis {
     }
 }
 
-fn narrow_value_range(
-    values: &mut BTreeMap<Vid, Value>,
-    vid: Vid,
-    range: &ValueRange,
-) -> ValueRange {
-    let owned_value = values.remove(&vid).unwrap();
-    let final_result = owned_value.narrow_range(range);
-    let final_range = final_result.range();
-    values.try_insert(vid, final_result).unwrap();
-    final_range
-}
-
 impl Analysis {
-    fn get_equivalent_value(&mut self, vid: Vid) -> Vid {
-        // Union-find on the equivalent values graph, always pointing toward lower-numbered Vids.
-        let mut current_vid = vid;
-        let mut ancestors = vec![];
-
-        let initial_range = &self.values[&vid].range();
-        let mut range = initial_range.clone();
-        while let Some(parent) = self.equivalent_values.get(&current_vid) {
-            assert!(*parent < current_vid); // protect against cycles
-
-            let parent_range = &self.values[parent].range();
-            range = range.intersect(parent_range).unwrap();
-
-            ancestors.push(current_vid);
-            current_vid = *parent;
-        }
-
-        // Not all the values we came across agreed on
-        if initial_range != &range {
-            for ancestor in &ancestors {
-                narrow_value_range(&mut self.values, *ancestor, &range);
-            }
-        }
-
-        // We skip one element from the back since the last element had the correct parent.
-        // All other elements need to point to this final equivalent value.
-        for ancestor in ancestors.into_iter().rev().skip(1) {
-            self.equivalent_values
-                .insert(ancestor, current_vid)
-                .unwrap();
-        }
-
-        current_vid
-    }
-
-    fn update_equivalent_values(&mut self, left: Vid, right: Vid) {
-        // Update the ranges of the values to match each other.
-        let left_range = &self.values[&left].range();
-        let right_range = &self.values[&right].range();
-        narrow_value_range(&mut self.values, left, right_range);
-        narrow_value_range(&mut self.values, right, left_range);
-
-        // Union-find on the equivalent values graph, always pointing toward lower-numbered Vids.
-        let left_equivalent = self.get_equivalent_value(left);
-        let right_equivalent = self.get_equivalent_value(right);
-
-        let (lower_vid, higher_vid) = match left_equivalent.cmp(&right_equivalent) {
-            Ordering::Less => (left_equivalent, right_equivalent),
-            Ordering::Greater => (right_equivalent, left_equivalent),
-            Ordering::Equal => unreachable!("{:?} {:?}", left_equivalent, right_equivalent),
-        };
-
-        self.equivalent_values.insert(higher_vid, lower_vid);
-    }
-
     pub fn constant_propagation(mut self) -> Self {
         for ann_instr in self.annotated.values() {
             let source_vid = ann_instr.source;
@@ -237,11 +306,8 @@ impl Analysis {
                         }
                     }
                 };
-                narrow_value_range(
-                    &mut self.values,
-                    result_vid,
-                    &ValueRange::new_exact(result_value),
-                );
+                self.values
+                    .narrow_value_range(result_vid, &ValueRange::new_exact(result_value));
             }
         }
 
@@ -272,26 +338,152 @@ impl Analysis {
                 Instruction::Mod(_, _) => {
                     // The source must be non-negative, and the operand must be strictly positive.
                     // The result must be between zero and the operand value minus one.
-                    narrow_value_range(
-                        &mut self.values,
-                        ann_instr.source,
-                        &ValueRange::new(0, i64::MAX),
-                    );
-                    let operand_range = narrow_value_range(
-                        &mut self.values,
-                        ann_instr.operand,
-                        &ValueRange::new(1, i64::MAX),
-                    );
-                    narrow_value_range(
-                        &mut self.values,
+                    self.values
+                        .narrow_value_range(ann_instr.source, &ValueRange::new(0, i64::MAX));
+                    let operand_range = self
+                        .values
+                        .narrow_value_range(ann_instr.operand, &ValueRange::new(1, i64::MAX));
+                    self.values.narrow_value_range(
                         ann_instr.result,
                         &ValueRange::new(0, operand_range.end() - 1),
                     );
                 }
                 Instruction::Equal(_, _) => {
                     // The result must be either 0 or 1.
-                    narrow_value_range(&mut self.values, ann_instr.result, &ValueRange::new(0, 1));
+                    self.values
+                        .narrow_value_range(ann_instr.result, &ValueRange::new(0, 1));
                 }
+            }
+        }
+
+        self
+    }
+
+    pub fn known_operation_results(mut self) -> Self {
+        for ann_instr in self.annotated.values() {
+            if matches!(ann_instr.instr, Instruction::Input(_)) {
+                continue;
+            }
+
+            let source_vid = ann_instr.source;
+            let operand_vid = ann_instr.operand;
+            let result_vid = ann_instr.result;
+            let source_range = &self.values[&source_vid].range();
+            let operand_range = &self.values[&operand_vid].range();
+
+            let was_already_no_op =
+                self.equivalent_values
+                    .are_equivalent(&mut self.values, source_vid, result_vid);
+
+            match ann_instr.instr {
+                Instruction::Input(_) => unreachable!(),
+                Instruction::Add(_, _) => {
+                    // Adding zero is a no-op.
+                    if source_range.is_exactly(0) {
+                        self.equivalent_values.update_equivalent_values(
+                            &mut self.values,
+                            operand_vid,
+                            result_vid,
+                        );
+                    }
+                    if operand_range.is_exactly(0) {
+                        self.equivalent_values.update_equivalent_values(
+                            &mut self.values,
+                            source_vid,
+                            result_vid,
+                        );
+                    }
+                }
+                Instruction::Mul(_, _) => {
+                    // Multiplying by one is a no-op.
+                    // Multiplying by zero produces zero.
+                    if source_range.is_exactly(1) || operand_range.is_exactly(0) {
+                        self.equivalent_values.update_equivalent_values(
+                            &mut self.values,
+                            operand_vid,
+                            result_vid,
+                        );
+                    }
+                    if operand_range.is_exactly(1) || source_range.is_exactly(0) {
+                        self.equivalent_values.update_equivalent_values(
+                            &mut self.values,
+                            source_vid,
+                            result_vid,
+                        );
+                    }
+                }
+                Instruction::Div(_, _) => {
+                    // If the operand's range ends on zero on either side,
+                    // we can shrink it to not include zero since division by zero is not allowed.
+                    if operand_range.start() == 0 {
+                        self.values.narrow_value_range(
+                            operand_vid,
+                            &ValueRange::new(1, operand_range.end()),
+                        );
+                    }
+                    if operand_range.end() == 0 {
+                        self.values.narrow_value_range(
+                            operand_vid,
+                            &ValueRange::new(operand_range.start(), -1),
+                        );
+                    }
+
+                    // Dividing zero by anything is a no-op.
+                    // Dividing by one is a no-op.
+                    if source_range.is_exactly(0) || operand_range.is_exactly(1) {
+                        self.equivalent_values.update_equivalent_values(
+                            &mut self.values,
+                            source_vid,
+                            result_vid,
+                        );
+                    }
+                }
+                Instruction::Mod(_, _) => {
+                    // Anything mod 1 will produce 0.
+                    if operand_range.is_exactly(1) {
+                        self.values
+                            .narrow_value_range(result_vid, &ValueRange::new_exact(0));
+                    }
+
+                    // If the maximum of the source's range is less than the minimum of
+                    // the mod operand's range, the mod is a no-op.
+                    // For example, for integers: 4 mod 12 == 4.
+                    // For example, for ranges: (4..=12) mod (23..=25) = (4..=12)
+                    if source_range.end() < operand_range.start() {
+                        self.equivalent_values.update_equivalent_values(
+                            &mut self.values,
+                            source_vid,
+                            result_vid,
+                        );
+                    }
+                }
+                Instruction::Equal(_, _) => {
+                    // If the two inputs have equivalent values, the result is always 1.
+                    if self.equivalent_values.are_equivalent(
+                        &mut self.values,
+                        source_vid,
+                        operand_vid,
+                    ) {
+                        self.values
+                            .narrow_value_range(result_vid, &ValueRange::new_exact(1));
+                    }
+
+                    // If the two inputs have non-overlapping ranges, the result is always 0.
+                    if source_range.intersect(operand_range).is_none() {
+                        self.values
+                            .narrow_value_range(result_vid, &ValueRange::new_exact(0));
+                    }
+                }
+            }
+
+            let is_now_no_op =
+                self.equivalent_values
+                    .are_equivalent(&mut self.values, source_vid, result_vid);
+
+            if is_now_no_op && !was_already_no_op {
+                self.pruned
+                    .try_insert(ann_instr.id, PrunedReason::NoOpInputs)
+                    .unwrap();
             }
         }
 
@@ -302,7 +494,7 @@ impl Analysis {
 fn perform_value_numbering(
     input_program: &BTreeMap<InstrId, Instruction>,
     annotated: &mut BTreeMap<InstrId, AnnotatedInstr>,
-    values: &mut BTreeMap<Vid, Value>,
+    values: &mut ValueRangeAnalysis,
     register_states: &mut BTreeMap<Rsid, RegisterState>,
     inputs: &mut Vec<Vid>,
 ) {
