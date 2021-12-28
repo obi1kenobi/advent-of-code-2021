@@ -5,6 +5,8 @@ use std::{
     ops::Index,
 };
 
+use nom::bytes::streaming::is_a;
+
 use crate::parser::{Instruction, Operand, Register};
 
 use self::values::{Value, ValueRange, Vid, VidMaker};
@@ -490,20 +492,76 @@ impl Analysis {
         self
     }
 
-    // pub fn unused_register_elimination(self) -> Self {
-    //     // Any register whose value gets clobbered without needing to be read first is
-    //     // functionally "dead" and might as well have an undefined value.
-    //     // Example instructions that clobber registers without reading them:
-    //     //   inp x
-    //     //   mul x 0
-    //     // Since this pass leaves registers in the undefined value (which has no range info, etc.),
-    //     // it leaves the Self object in a state where not all other passes can be run anymore.
-    //     // As a result, this should probably be one of the last passes to be executed.
-    //     let register_is_unused = [false; 4];
-    //     for ann_instr in self.annotated.values() {
+    /// Any register whose value gets clobbered without needing to be read first is
+    /// functionally "dead" and might as well have an undefined value.
+    /// Example instructions that clobber registers without reading them:
+    ///   inp x
+    ///   mul x 0
+    /// Since this pass leaves registers in the undefined value (which has no range info, etc.),
+    /// it leaves the Self object in a state where not all other passes can be run anymore.
+    /// As a result, this should probably be one of the last passes to be executed.
+    pub fn unused_register_elimination(mut self) -> Self {
+        // Everything but the z register is unused after the last instruction executes.
+        let mut register_is_unused = [true, true, true, false];
 
-    //     }
-    // }
+        let undefined_vid = Vid(self.values.0.keys().last().unwrap().0 + 1);
+        self.values
+            .try_insert(undefined_vid, Value::Undefined)
+            .unwrap();
+
+        for ann_instr in self.annotated.values().rev() {
+            let state_after = ann_instr.state_after;
+
+            for (is_unused, register_value) in register_is_unused.iter().zip(
+                self.register_states
+                    .get_mut(&state_after)
+                    .unwrap()
+                    .registers
+                    .iter_mut(),
+            ) {
+                if *is_unused {
+                    *register_value = undefined_vid;
+                }
+            }
+
+            match ann_instr.instr {
+                Instruction::Input(Register(n)) => {
+                    register_is_unused[n] = true;
+                }
+                Instruction::Mul(Register(n), operand) => {
+                    match operand {
+                        Operand::Literal(_) => {},
+                        Operand::Register(Register(r)) => {
+                            register_is_unused[r] = false;
+                        }
+                    }
+
+                    let operand_range = &self.values[&ann_instr.operand].range();
+                    if operand_range.is_exactly(0) {
+                        // We're multiplying by 0, so the source register's value doesn't matter
+                        // since it gets overwritten by 0 regardless.
+                        register_is_unused[n] = true;
+                    } else {
+                        register_is_unused[n] = false;
+                    }
+                }
+                Instruction::Add(Register(n), operand) |
+                Instruction::Div(Register(n), operand) |
+                Instruction::Mod(Register(n), operand) |
+                Instruction::Equal(Register(n), operand) => {
+                    match operand {
+                        Operand::Literal(_) => {},
+                        Operand::Register(Register(r)) => {
+                            register_is_unused[r] = false;
+                        }
+                    }
+                    register_is_unused[n] = false;
+                }
+            }
+        }
+
+        self
+    }
 }
 
 fn perform_value_numbering(
