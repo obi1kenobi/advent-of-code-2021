@@ -536,9 +536,7 @@ impl Analysis {
             let result_range = match ann_instr.instr {
                 Instruction::Input(_) => unreachable!(),
                 Instruction::Add(_, _) => Some(source_range + operand_range),
-                Instruction::Mul(_, _) => {
-                    Some(source_range * operand_range)
-                }
+                Instruction::Mul(_, _) => Some(source_range * operand_range),
                 Instruction::Div(_, _) => {
                     // The Advent of Code challenge input only contains divisions
                     // by a literal value, and never divides one register by another.
@@ -590,13 +588,15 @@ impl Analysis {
     pub fn matched_mul_and_div_or_mod(mut self) -> Self {
         // Vid -> known to be multiple i64 -> of vid with (remainder, origin if single)
         #[allow(clippy::type_complexity)]
-        let mut known_div_values: BTreeMap<Vid, BTreeMap<i64, (Vid, (ValueRange, Option<Vid>))>> = Default::default();
+        let mut known_div_values: BTreeMap<
+            Vid,
+            BTreeMap<i64, (Vid, (ValueRange, Option<Vid>))>,
+        > = Default::default();
 
         for ann_instr in self.annotated.values() {
             if matches!(
                 ann_instr.instr,
-                Instruction::Input(_)
-                    | Instruction::Equal(..)
+                Instruction::Input(_) | Instruction::Equal(..)
             ) {
                 continue;
             }
@@ -644,7 +644,9 @@ impl Analysis {
                                     }
                                 })
                                 .collect();
-                            known_div_values.try_insert(result_vid, offset_multipliers).unwrap();
+                            known_div_values
+                                .try_insert(result_vid, offset_multipliers)
+                                .unwrap();
                         }
                     }
                 }
@@ -679,7 +681,12 @@ impl Analysis {
                             (new_multiplier, (vid, (new_remainder, origin)))
                         })
                         .collect();
-                    prior_values.try_insert(multiplier, (vid_to_record, (ValueRange::new_exact(0), None))).unwrap();
+                    prior_values
+                        .try_insert(
+                            multiplier,
+                            (vid_to_record, (ValueRange::new_exact(0), None)),
+                        )
+                        .unwrap();
                     known_div_values
                         .try_insert(result_vid, prior_values)
                         .unwrap();

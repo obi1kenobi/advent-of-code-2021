@@ -1,8 +1,6 @@
 #![feature(map_try_insert)]
 
-use std::{
-    env, fs,
-};
+use std::{env, fs};
 
 use analysis::Analysis;
 #[allow(unused_imports)]
@@ -13,8 +11,8 @@ use parser::{parse_program, Instruction};
 #[allow(unused_imports)]
 use crate::parser::InstructionStream;
 
-mod parser;
 mod analysis;
+mod parser;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -44,7 +42,7 @@ fn main() {
 }
 
 fn optimize_program(input_program: &[Instruction]) -> Analysis {
-    let analysis: Analysis =  input_program.iter().cloned().collect_vec().into();
+    let analysis: Analysis = input_program.iter().cloned().collect_vec().into();
 
     let mut current_analysis = analysis.operation_definedness();
 
@@ -56,8 +54,7 @@ fn optimize_program(input_program: &[Instruction]) -> Analysis {
             .constant_propagation()
             .known_operation_results()
             .forward_value_range_analysis()
-            .matched_mul_and_div_or_mod()
-        ;
+            .matched_mul_and_div_or_mod();
 
         if current_analysis.values == value_ranges {
             break current_analysis;
@@ -69,12 +66,8 @@ fn optimize_program(input_program: &[Instruction]) -> Analysis {
     current_analysis
         // Instruction pruning isn't useful in the early passes, so save it until later.
         .prune_for_no_change_in_registers()
-
         // Keep this pass near the bottom, since prior analysis passes are not compatible with it.
         .unused_register_elimination()
-
-        // At the moment, this pass doesn't seem to do anything, reconsider and maybe enable
-        // if it does something after more analysis passes are implemented.
         .unused_result_elimination()
 }
 

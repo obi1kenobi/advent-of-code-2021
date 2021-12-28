@@ -1,4 +1,7 @@
-use std::{ops::{Add, RangeInclusive, Sub, Mul}, fmt::Display};
+use std::{
+    fmt::Display,
+    ops::{Add, Mul, RangeInclusive, Sub},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Vid(pub usize);
@@ -173,7 +176,7 @@ impl Mul<&ValueRange> for &ValueRange {
 #[derive(Debug, Clone)]
 pub enum Value {
     Exact(Vid, i64),
-    Input(Vid, usize, ValueRange),  // which input number is it
+    Input(Vid, usize, ValueRange), // which input number is it
     Unknown(Vid, ValueRange),
     Undefined,
 }
@@ -201,9 +204,7 @@ impl Value {
     #[inline]
     pub fn vid(&self) -> Vid {
         match self {
-            Value::Exact(vid, _) |
-            Value::Input(vid, _, _) |
-            Value::Unknown(vid, _) => *vid,
+            Value::Exact(vid, _) | Value::Input(vid, _, _) | Value::Unknown(vid, _) => *vid,
             Value::Undefined => unreachable!(),
         }
     }
@@ -231,7 +232,7 @@ impl Value {
                 } else {
                     Value::Unknown(vid, final_range)
                 }
-            },
+            }
             Value::Undefined => unreachable!(),
         }
     }
