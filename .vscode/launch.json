@@ -7,15 +7,15 @@
         {
             "type": "lldb",
             "request": "launch",
-            "program": "/home/predrag/.scratch/.rustc-target/advent-of-code-2021/day5/target/debug/day5",
-            "cwd": "${workspaceFolder}/day5/",
+            "program": "/home/predrag/.scratch/.rustc-target/advent-of-code-2021/day24/target/debug/day24",
+            "cwd": "${workspaceFolder}/day24/",
             "name": "Debug pt1",
             "preRunCommands": [
-                "target create /home/predrag/.scratch/.rustc-target/advent-of-code-2021/day5/target/debug/day5"
+                "target create /home/predrag/.scratch/.rustc-target/advent-of-code-2021/day24/target/debug/day24"
             ],
             "args": [
                 "1",
-                "example.txt",
+                "input.txt",
             ]
         },
         {

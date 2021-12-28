@@ -131,11 +131,6 @@ impl Index<&Vid> for ValueRangeAnalysis {
 pub struct ValueEquivalenceAnalysis(BTreeMap<Vid, Vid>);
 
 impl ValueEquivalenceAnalysis {
-    #[inline]
-    pub fn new() -> Self {
-        Self(Default::default())
-    }
-
     fn are_equivalent(&mut self, values: &mut ValueRangeAnalysis, left: Vid, right: Vid) -> bool {
         let left_equivalent = self.get_equivalent_value(values, left);
         let right_equivalent = self.get_equivalent_value(values, right);
@@ -147,6 +142,12 @@ impl ValueEquivalenceAnalysis {
             // so these values may still be equal to each other. Check their values for equality.
             values[&left_equivalent] == values[&right_equivalent]
         }
+    }
+
+    /// Should only be used for impl Display!
+    /// Otherwise, can lead to long chains rather than flat forests of equivalent values.
+    fn get_equivalent_value_no_update(&self, vid: Vid) -> Vid {
+        *self.0.get(&vid).unwrap_or(&vid)
     }
 
     fn get_equivalent_value(&mut self, values: &mut ValueRangeAnalysis, vid: Vid) -> Vid {
@@ -199,7 +200,7 @@ impl ValueEquivalenceAnalysis {
         let left_equivalent = self.get_equivalent_value(values, left);
         let right_equivalent = self.get_equivalent_value(values, right);
 
-        if left_equivalent != right_equivalent {
+        if left_equivalent == right_equivalent {
             // These values are already known to be equivalent. Nothing further to be done.
             return;
         }
@@ -235,15 +236,17 @@ impl Display for Analysis {
             }
 
             let annotated = &self.annotated[instr_id];
-            let registers_after = self.register_states[&annotated.state_after];
+            let equivalent_registers_after = &self.register_states[&annotated.state_after]
+                .registers
+                .map(|v| self.equivalent_values.get_equivalent_value_no_update(v));
 
             writeln!(
                 f,
                 "[{: ^22} | {: ^22} | {: ^22} | {: ^22}]",
-                format!("{}", self.values[&registers_after.registers[0]]),
-                format!("{}", self.values[&registers_after.registers[1]]),
-                format!("{}", self.values[&registers_after.registers[2]]),
-                format!("{}", self.values[&registers_after.registers[3]]),
+                format!("{}", self.values[&equivalent_registers_after[0]]),
+                format!("{}", self.values[&equivalent_registers_after[1]]),
+                format!("{}", self.values[&equivalent_registers_after[2]]),
+                format!("{}", self.values[&equivalent_registers_after[3]]),
             )?;
         }
 
@@ -370,14 +373,19 @@ impl Analysis {
 
             let mut no_change = true;
             for (r_before, r_after) in registers_before.iter().zip(registers_after) {
-                if !self.equivalent_values.are_equivalent(&mut self.values, *r_before, *r_after) {
+                if !self
+                    .equivalent_values
+                    .are_equivalent(&mut self.values, *r_before, *r_after)
+                {
                     no_change = false;
                     break;
                 }
             }
 
             if no_change {
-                self.pruned.entry(ann_instr.id).or_insert(PrunedReason::NoRegisterChange);
+                self.pruned
+                    .entry(ann_instr.id)
+                    .or_insert(PrunedReason::NoRegisterChange);
             }
         }
 
@@ -555,7 +563,7 @@ impl Analysis {
                 }
                 Instruction::Mul(Register(n), operand) => {
                     match operand {
-                        Operand::Literal(_) => {},
+                        Operand::Literal(_) => {}
                         Operand::Register(Register(r)) => {
                             register_is_unused[r] = false;
                         }
@@ -570,12 +578,12 @@ impl Analysis {
                         register_is_unused[n] = false;
                     }
                 }
-                Instruction::Add(Register(n), operand) |
-                Instruction::Div(Register(n), operand) |
-                Instruction::Mod(Register(n), operand) |
-                Instruction::Equal(Register(n), operand) => {
+                Instruction::Add(Register(n), operand)
+                | Instruction::Div(Register(n), operand)
+                | Instruction::Mod(Register(n), operand)
+                | Instruction::Equal(Register(n), operand) => {
                     match operand {
-                        Operand::Literal(_) => {},
+                        Operand::Literal(_) => {}
                         Operand::Register(Register(r)) => {
                             register_is_unused[r] = false;
                         }
@@ -598,13 +606,14 @@ impl Analysis {
         let mut overwrite_unused: [Option<Vid>; 4] = [None, None, None, None];
 
         for ann_instr in self.annotated.values().rev() {
-            let state_after = self.register_states
-                    .get_mut(&ann_instr.state_after).unwrap();
-            for (maybe_vid, register_value) in overwrite_unused.iter().zip(
-                    state_after
-                    .registers
-                    .iter_mut(),
-            ) {
+            let state_after = self
+                .register_states
+                .get_mut(&ann_instr.state_after)
+                .unwrap();
+            for (maybe_vid, register_value) in overwrite_unused
+                .iter()
+                .zip(state_after.registers.iter_mut())
+            {
                 if let Some(undefined_vid) = maybe_vid {
                     *register_value = *undefined_vid;
                 }
@@ -614,21 +623,23 @@ impl Analysis {
 
             match ann_instr.instr {
                 Instruction::Input(_) => {}
-                Instruction::Mul(Register(n), operand) |
-                Instruction::Add(Register(n), operand) |
-                Instruction::Div(Register(n), operand) |
-                Instruction::Mod(Register(n), operand) |
-                Instruction::Equal(Register(n), operand) => {
+                Instruction::Mul(Register(n), operand)
+                | Instruction::Add(Register(n), operand)
+                | Instruction::Div(Register(n), operand)
+                | Instruction::Mod(Register(n), operand)
+                | Instruction::Equal(Register(n), operand) => {
                     let result_vid = registers_after[n];
                     if matches!(self.values[&result_vid], Value::Undefined) {
                         // The result of this operation is never used.
                         // We prune this operation, if it wasn't pruned already.
-                        self.pruned.entry(ann_instr.id).or_insert(PrunedReason::ResultNeverUsed);
+                        self.pruned
+                            .entry(ann_instr.id)
+                            .or_insert(PrunedReason::ResultNeverUsed);
 
                         overwrite_unused[n] = Some(result_vid);
 
                         match operand {
-                            Operand::Literal(_) => {},
+                            Operand::Literal(_) => {}
                             Operand::Register(Register(r)) => {
                                 let after_op_operand_vid = registers_after[r];
                                 if matches!(self.values[&after_op_operand_vid], Value::Undefined) {
@@ -641,7 +652,7 @@ impl Analysis {
                         }
                     } else {
                         match operand {
-                            Operand::Literal(_) => {},
+                            Operand::Literal(_) => {}
                             Operand::Register(Register(r)) => {
                                 overwrite_unused[r] = None;
                             }
