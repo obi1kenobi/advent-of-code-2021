@@ -78,6 +78,8 @@ pub struct AnnotatedInstr {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PrunedReason {
     NoOpInputs,
+    NoRegisterChange,
+    ResultNeverUsed,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -361,6 +363,27 @@ impl Analysis {
         self
     }
 
+    pub fn prune_for_no_change_in_registers(mut self) -> Self {
+        for ann_instr in self.annotated.values() {
+            let registers_before = &self.register_states[&ann_instr.state_before].registers;
+            let registers_after = &self.register_states[&ann_instr.state_after].registers;
+
+            let mut no_change = true;
+            for (r_before, r_after) in registers_before.iter().zip(registers_after) {
+                if !self.equivalent_values.are_equivalent(&mut self.values, *r_before, *r_after) {
+                    no_change = false;
+                    break;
+                }
+            }
+
+            if no_change {
+                self.pruned.entry(ann_instr.id).or_insert(PrunedReason::NoRegisterChange);
+            }
+        }
+
+        self
+    }
+
     pub fn known_operation_results(mut self) -> Self {
         for ann_instr in self.annotated.values() {
             if matches!(ann_instr.instr, Instruction::Input(_)) {
@@ -500,6 +523,8 @@ impl Analysis {
     /// Since this pass leaves registers in the undefined value (which has no range info, etc.),
     /// it leaves the Self object in a state where not all other passes can be run anymore.
     /// As a result, this should probably be one of the last passes to be executed.
+    ///
+    /// It does not make sense to run this pass more than once, since it is idempotent.
     pub fn unused_register_elimination(mut self) -> Self {
         // Everything but the z register is unused after the last instruction executes.
         let mut register_is_unused = [true, true, true, false];
@@ -556,6 +581,73 @@ impl Analysis {
                         }
                     }
                     register_is_unused[n] = false;
+                }
+            }
+        }
+
+        self
+    }
+
+    /// An analysis pass made to work after unused_register_elimination().
+    /// It looks for instruction results that never get used, then:
+    /// - prunes the instruction
+    /// - propagates the source register's Undefined state upward
+    /// - if the operand was a register and was unused after that instruction, it propagates
+    ///   that register's Undefined state upward as well
+    pub fn unused_result_elimination(mut self) -> Self {
+        let mut overwrite_unused: [Option<Vid>; 4] = [None, None, None, None];
+
+        for ann_instr in self.annotated.values().rev() {
+            let state_after = self.register_states
+                    .get_mut(&ann_instr.state_after).unwrap();
+            for (maybe_vid, register_value) in overwrite_unused.iter().zip(
+                    state_after
+                    .registers
+                    .iter_mut(),
+            ) {
+                if let Some(undefined_vid) = maybe_vid {
+                    *register_value = *undefined_vid;
+                }
+            }
+
+            let registers_after = &state_after.registers;
+
+            match ann_instr.instr {
+                Instruction::Input(_) => {}
+                Instruction::Mul(Register(n), operand) |
+                Instruction::Add(Register(n), operand) |
+                Instruction::Div(Register(n), operand) |
+                Instruction::Mod(Register(n), operand) |
+                Instruction::Equal(Register(n), operand) => {
+                    let result_vid = registers_after[n];
+                    if matches!(self.values[&result_vid], Value::Undefined) {
+                        // The result of this operation is never used.
+                        // We prune this operation, if it wasn't pruned already.
+                        self.pruned.entry(ann_instr.id).or_insert(PrunedReason::ResultNeverUsed);
+
+                        overwrite_unused[n] = Some(result_vid);
+
+                        match operand {
+                            Operand::Literal(_) => {},
+                            Operand::Register(Register(r)) => {
+                                let after_op_operand_vid = registers_after[r];
+                                if matches!(self.values[&after_op_operand_vid], Value::Undefined) {
+                                    // The operand register of this operation was only defined
+                                    // so it could be used in this operation. Since it's not being
+                                    // used after all, we make it undefined.
+                                    overwrite_unused[r] = Some(after_op_operand_vid);
+                                }
+                            }
+                        }
+                    } else {
+                        match operand {
+                            Operand::Literal(_) => {},
+                            Operand::Register(Register(r)) => {
+                                overwrite_unused[r] = None;
+                            }
+                        }
+                        overwrite_unused[n] = None;
+                    }
                 }
             }
         }

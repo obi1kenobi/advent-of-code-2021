@@ -51,9 +51,14 @@ fn optimize_program(input_program: &[Instruction]) -> Analysis {
         .operation_definedness()
         .known_operation_results()
         .constant_propagation()  // known_operation_results() may have generated more constants
+        .prune_for_no_change_in_registers()
 
         // Keep this pass near the bottom, since prior analysis passes are not compatible with it.
         .unused_register_elimination()
+
+        // At the moment, this pass doesn't seem to do anything, reconsider and maybe enable
+        // if it does something after more analysis passes are implemented.
+        // .unused_result_elimination()
 }
 
 #[allow(unused_variables)]
