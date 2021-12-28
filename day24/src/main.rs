@@ -46,11 +46,26 @@ fn main() {
 fn optimize_program(input_program: &[Instruction]) -> Analysis {
     let analysis: Analysis =  input_program.iter().cloned().collect_vec().into();
 
-    analysis
-        .constant_propagation()
-        .operation_definedness()
-        .known_operation_results()
-        .constant_propagation()  // known_operation_results() may have generated more constants
+    let mut current_analysis = analysis.operation_definedness();
+
+    // Iterate the next few passes until a fixpoint is found,
+    // since the passes create opportunities for each other to optimize further.
+    let mut value_ranges = current_analysis.values.clone();
+    current_analysis = loop {
+        current_analysis = current_analysis
+            .constant_propagation()
+            .known_operation_results()
+            .forward_value_range_analysis();
+
+        if current_analysis.values == value_ranges {
+            break current_analysis;
+        } else {
+            value_ranges = current_analysis.values.clone();
+        }
+    };
+
+    current_analysis
+        // Instruction pruning isn't useful in the early passes, so save it until later.
         .prune_for_no_change_in_registers()
 
         // Keep this pass near the bottom, since prior analysis passes are not compatible with it.

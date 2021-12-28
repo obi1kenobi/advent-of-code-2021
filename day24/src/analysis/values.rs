@@ -164,6 +164,7 @@ impl Eq for Value {
 }
 
 impl Value {
+    #[allow(dead_code)]
     #[inline]
     pub fn vid(&self) -> Vid {
         match self {

@@ -82,7 +82,7 @@ pub enum PrunedReason {
     ResultNeverUsed,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ValueRangeAnalysis(BTreeMap<Vid, Value>);
 
 impl ValueRangeAnalysis {
@@ -523,6 +523,40 @@ impl Analysis {
         self
     }
 
+    pub fn forward_value_range_analysis(mut self) -> Self {
+        for ann_instr in self.annotated.values() {
+            if matches!(ann_instr.instr, Instruction::Input(_)) {
+                continue;
+            }
+
+            let source_vid = ann_instr.source;
+            let operand_vid = ann_instr.operand;
+            let result_vid = ann_instr.result;
+            let source_range = &self.values[&source_vid].range();
+            let operand_range = &self.values[&operand_vid].range();
+
+            let result_range = match ann_instr.instr {
+                Instruction::Input(_) => unreachable!(),
+                Instruction::Add(_, _) => {
+                    Some(source_range + operand_range)
+                },
+                Instruction::Mul(_, _) => None,  // TODO: implement me
+                Instruction::Div(_, _) => None,  // TODO: implement me
+                Instruction::Mod(_, _) |
+                Instruction::Equal(_, _) => {
+                    // There isn't any direct forward range analysis that can be done here
+                    // that isn't already covered in the known operation results pass.
+                    None
+                }
+            };
+            if let Some(result_range) = result_range {
+                self.values.narrow_value_range(result_vid, &result_range);
+            }
+        }
+
+        self
+    }
+
     /// Any register whose value gets clobbered without needing to be read first is
     /// functionally "dead" and might as well have an undefined value.
     /// Example instructions that clobber registers without reading them:
@@ -550,7 +584,7 @@ impl Analysis {
                     .get_mut(&state_after)
                     .unwrap()
                     .registers
-                    .iter_mut(),
+                    .iter_mut()
             ) {
                 if *is_unused {
                     *register_value = undefined_vid;
