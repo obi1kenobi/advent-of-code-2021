@@ -1,4 +1,4 @@
-use std::{ops::{Add, RangeInclusive, Sub}, fmt::Display};
+use std::{ops::{Add, RangeInclusive, Sub, Mul}, fmt::Display};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Vid(pub usize);
@@ -133,6 +133,19 @@ impl Sub for &ValueRange {
         Self::Output::new(
             self.start().saturating_sub(rhs.end()),
             self.end().saturating_sub(rhs.start()),
+        )
+    }
+}
+
+impl Mul<i64> for &ValueRange {
+    type Output = ValueRange;
+
+    fn mul(self, rhs: i64) -> Self::Output {
+        let endpoint_a = self.start().saturating_mul(rhs);
+        let endpoint_b = self.start().saturating_mul(rhs);
+        Self::Output::new(
+            std::cmp::min(endpoint_a, endpoint_b),
+            std::cmp::max(endpoint_a, endpoint_b),
         )
     }
 }

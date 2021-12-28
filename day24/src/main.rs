@@ -55,7 +55,9 @@ fn optimize_program(input_program: &[Instruction]) -> Analysis {
         current_analysis = current_analysis
             .constant_propagation()
             .known_operation_results()
-            .forward_value_range_analysis();
+            .forward_value_range_analysis()
+            .matched_mul_and_div_or_mod()
+        ;
 
         if current_analysis.values == value_ranges {
             break current_analysis;

@@ -1,0 +1,44 @@
+mul y 0
+[  58: Input_2(1..=9)   |     N/A: Undefined     |      71: Exact(0)      | 57: Unknown(112..=328)]
+add y 25
+[  58: Input_2(1..=9)   |     N/A: Undefined     |     73: Exact(25)      | 57: Unknown(112..=328)]
+mul y x  *pruned: NoOpInputs
+[  58: Input_2(1..=9)   |     N/A: Undefined     |     73: Exact(25)      | 57: Unknown(112..=328)]
+add y 1
+[  58: Input_2(1..=9)   |     N/A: Undefined     |     77: Exact(26)      | 57: Unknown(112..=328)]
+mul z y
+[  58: Input_2(1..=9)   |     N/A: Undefined     |     N/A: Undefined     | 78: Unknown(2912..=8528)]
+mul y 0
+[  58: Input_2(1..=9)   |     N/A: Undefined     |      79: Exact(0)      | 78: Unknown(2912..=8528)]
+add y w
+[    N/A: Undefined     |     N/A: Undefined     |   58: Input_2(1..=9)   | 78: Unknown(2912..=8528)]
+add y 1
+[    N/A: Undefined     |     N/A: Undefined     |  83: Unknown(2..=10)   | 78: Unknown(2912..=8528)]
+mul y x  *pruned: NoOpInputs
+[    N/A: Undefined     |     N/A: Undefined     |  83: Unknown(2..=10)   | 78: Unknown(2912..=8528)]
+add z y
+[    N/A: Undefined     |     N/A: Undefined     |     N/A: Undefined     | 85: Unknown(2914..=8538)]
+inp w
+[  86: Input_3(1..=9)   |     N/A: Undefined     |     N/A: Undefined     | 85: Unknown(2914..=8538)]
+mul x 0
+[  86: Input_3(1..=9)   |      87: Exact(0)      |     N/A: Undefined     | 85: Unknown(2914..=8538)]
+add x z
+[  86: Input_3(1..=9)   | 85: Unknown(2914..=8538) |     N/A: Undefined     | 85: Unknown(2914..=8538)]
+mod x 26
+[  86: Input_3(1..=9)   |  91: Unknown(0..=25)   |     N/A: Undefined     | 85: Unknown(2914..=8538)]
+div z 26
+[  86: Input_3(1..=9)   |  91: Unknown(0..=25)   |     N/A: Undefined     | 93: Unknown(112..=328)]
+
+Interesting sequence here:
+- value 78 = value 57 * 26
+- value 85 = value 78 + input 2 + 1
+- value 91 = value 85 mod 26
+  --> but we know that's actually just (input 2 + 1), because
+      value 85 = (value 57 * 26) + input 2 + 1
+      and input 2 + 1 < 26
+- value 93 = value 85 / 26
+  --> but we know that's actually just value 57, because again
+      value 85 = (value 57 * 26) + input 2 + 1
+      and input 2 + 1 < 26 so it gets truncated in the division
+
+See

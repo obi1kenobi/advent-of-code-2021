@@ -5,8 +5,6 @@ use std::{
     ops::Index,
 };
 
-use nom::bytes::streaming::is_a;
-
 use crate::parser::{Instruction, Operand, Register};
 
 use self::values::{Value, ValueRange, Vid, VidMaker};
@@ -537,13 +535,41 @@ impl Analysis {
 
             let result_range = match ann_instr.instr {
                 Instruction::Input(_) => unreachable!(),
-                Instruction::Add(_, _) => {
-                    Some(source_range + operand_range)
-                },
-                Instruction::Mul(_, _) => None,  // TODO: implement me
-                Instruction::Div(_, _) => None,  // TODO: implement me
-                Instruction::Mod(_, _) |
-                Instruction::Equal(_, _) => {
+                Instruction::Add(_, _) => Some(source_range + operand_range),
+                Instruction::Mul(_, _) => {
+                    if operand_range.is_exact() {
+                        let operand_value = operand_range.start();
+                        let result_a = source_range.start().saturating_mul(operand_value);
+                        let result_b = source_range.end().saturating_mul(operand_value);
+                        Some(ValueRange::new(
+                            std::cmp::min(result_a, result_b),
+                            std::cmp::max(result_a, result_b),
+                        ))
+                    } else {
+                        // TODO: implement me, be very careful with edge cases
+                        None
+                    }
+                }
+                Instruction::Div(_, _) => {
+                    // The Advent of Code challenge input only contains divisions
+                    // by a literal value, and never divides one register by another.
+                    //
+                    // We can implement the easy literal division range propagation,
+                    // and let the more complex register case claim "no information" about
+                    // the range of the result.
+                    if operand_range.is_exact() {
+                        let operand_value = operand_range.start();
+                        let result_a = source_range.start().saturating_div(operand_value);
+                        let result_b = source_range.end().saturating_div(operand_value);
+                        Some(ValueRange::new(
+                            std::cmp::min(result_a, result_b),
+                            std::cmp::max(result_a, result_b),
+                        ))
+                    } else {
+                        None
+                    }
+                }
+                Instruction::Mod(_, _) | Instruction::Equal(_, _) => {
                     // There isn't any direct forward range analysis that can be done here
                     // that isn't already covered in the known operation results pass.
                     None
@@ -551,6 +577,200 @@ impl Analysis {
             };
             if let Some(result_range) = result_range {
                 self.values.narrow_value_range(result_vid, &result_range);
+            }
+        }
+
+        self
+    }
+
+    /// Look for mul and div/mod no-op instruction groups like:
+    /// 1) "mul x 13; add x 10; mul 2; div x 26", in which case:
+    ///    - this is essentially "mul x 26; add x 20" followed by the div
+    ///    - the div truncates out the addition, and leaves us with the original value in the mul.
+    /// 2) "mul x 13; add x 10; mul 2; mod x 26", in which case:
+    ///    - this is essentially "mul x 26; add x 20" followed by the mod
+    ///    - the mod eliminates all but the added 20
+    /// This pass also supports addition operations that refer to a register, so long as
+    /// the accumulated remainder always remains positive and smaller than the divisor or modulus.
+    ///
+    /// We can also mark the source register of the latter instruction as unused, and perhaps
+    /// some of the intermediate instructions as well. This may open up more opportunities
+    /// for optimization in other passes.
+    /// (TODO the above, perhaps best to mutate self to record this info for later, so as not to
+    ///  disable other numeric passes due to the Undefined register value).
+    pub fn matched_mul_and_div_or_mod(mut self) -> Self {
+        // Vid -> known to be multiple i64 -> of vid with (remainder, origin if single)
+        #[allow(clippy::type_complexity)]
+        let mut known_div_values: BTreeMap<Vid, BTreeMap<i64, (Vid, (ValueRange, Option<Vid>))>> = Default::default();
+
+        for ann_instr in self.annotated.values() {
+            if matches!(
+                ann_instr.instr,
+                Instruction::Input(_)
+                    | Instruction::Equal(..)
+            ) {
+                continue;
+            }
+
+            let source_vid = ann_instr.source;
+            let operand_vid = ann_instr.operand;
+            let result_vid = ann_instr.result;
+            let source_range = &self.values[&source_vid].range();
+            let operand_range = &self.values[&operand_vid].range();
+
+            match ann_instr.instr {
+                Instruction::Add(_, _) => {
+                    let tuples = [
+                        (&source_vid, &operand_vid, operand_range),
+                        (&operand_vid, &source_vid, source_range),
+                    ];
+
+                    for (input_vid, offset_source_vid, offset_range) in tuples {
+                        if let Some(multipliers) = known_div_values.get(input_vid) {
+                            let offset_multipliers: BTreeMap<_, _> = multipliers
+                                .iter()
+                                .filter_map(|(multiplier, (vid, (range, origin)))| {
+                                    let new_range = range + offset_range;
+
+                                    // If there's a prior origin, we can't capture both of them.
+                                    // If there's no prior origin, it might be that
+                                    // we've given up as above previously.
+                                    // However, if there's no prior origin and the range is zero,
+                                    // then this is the first remainder we are tracking.
+                                    let new_origin = if origin.is_none() && range.is_exactly(0) {
+                                        Some(*offset_source_vid)
+                                    } else if offset_range.is_exactly(0) {
+                                        // This addition is a no-op, propagate the prior origin.
+                                        *origin
+                                    } else {
+                                        None
+                                    };
+
+                                    if new_range.start() < 0 {
+                                        // The division will no longer be exact,
+                                        // we can't represent this.
+                                        None
+                                    } else {
+                                        Some((*multiplier, (*vid, (new_range, new_origin))))
+                                    }
+                                })
+                                .collect();
+                            known_div_values.try_insert(result_vid, offset_multipliers).unwrap();
+                        }
+                    }
+                }
+                Instruction::Mul(_, _) => {
+                    if self.values[&result_vid].range().is_exact() {
+                        // The result value is known exactly, we won't learn anything new.
+                        continue;
+                    }
+                    let (multiplier, vid_to_record) = if operand_range.is_exact() {
+                        (operand_range.start(), source_vid)
+                    } else if source_range.is_exact() {
+                        (source_range.start(), operand_vid)
+                    } else {
+                        // Neither bound is known exactly, we can't figure out the multipliers.
+                        continue;
+                    };
+
+                    if multiplier < 2 {
+                        // 1 and 0 aren't worth implementing because other passes handle them.
+                        // Haven't yet worked out whether / how this works with negative numbers.
+                        continue;
+                    }
+
+                    let mut prior_values: BTreeMap<_, _> = known_div_values
+                        .get(&vid_to_record)
+                        .cloned()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .map(|(value, (vid, (remainder, origin)))| {
+                            let new_multiplier = value * multiplier;
+                            let new_remainder = &remainder * multiplier;
+                            (new_multiplier, (vid, (new_remainder, origin)))
+                        })
+                        .collect();
+                    prior_values.try_insert(multiplier, (vid_to_record, (ValueRange::new_exact(0), None))).unwrap();
+                    known_div_values
+                        .try_insert(result_vid, prior_values)
+                        .unwrap();
+                }
+                Instruction::Div(_, _) => {
+                    if self.values[&result_vid].range().is_exact() {
+                        // The result value is known exactly, we won't learn anything new.
+                        continue;
+                    }
+                    let (divisor, divided_vid) = if operand_range.is_exact() {
+                        (operand_range.start(), source_vid)
+                    } else if source_range.is_exact() {
+                        (source_range.start(), operand_vid)
+                    } else {
+                        // Neither bound is known exactly, we can't match it to a mul operation.
+                        continue;
+                    };
+
+                    if divisor < 2 {
+                        // 1 and 0 aren't worth implementing because other passes handle them.
+                        // Haven't yet worked out whether / how this works with negative numbers.
+                        continue;
+                    }
+
+                    if let Some((equivalent_vid, (remainder, _))) = known_div_values
+                        .get(&divided_vid)
+                        .map(|multipliers| multipliers.get(&divisor))
+                        .flatten()
+                    {
+                        // Ensure that the non-multiplied portion will get truncated out,
+                        // leaving only the original, pre-multiplication value.
+                        if remainder.end() < divisor {
+                            // Success! We found that divided_vid / divisor == equivalent_vid.
+                            self.equivalent_values.update_equivalent_values(
+                                &mut self.values,
+                                *equivalent_vid,
+                                result_vid,
+                            );
+                        }
+                    }
+                }
+                Instruction::Mod(_, _) => {
+                    if self.values[&result_vid].range().is_exact() {
+                        // The result value is known exactly, we won't learn anything new.
+                        continue;
+                    }
+                    let (divisor, divided_vid) = if operand_range.is_exact() {
+                        (operand_range.start(), source_vid)
+                    } else if source_range.is_exact() {
+                        (source_range.start(), operand_vid)
+                    } else {
+                        // Neither bound is known exactly, we can't match it to a mul operation.
+                        continue;
+                    };
+
+                    if divisor < 2 {
+                        // 1 isn't worth implementing because other passes handle it.
+                        // The divisor (modulus) should never be 0 or lower, because that's UB.
+                        continue;
+                    }
+
+                    // Ensure that we've been able to track where this remainder came from.
+                    if let Some((_, (remainder, Some(remainder_origin)))) = known_div_values
+                        .get(&divided_vid)
+                        .map(|multipliers| multipliers.get(&divisor))
+                        .flatten()
+                    {
+                        // Ensure that the remainder is smaller than the modulus,
+                        // making the mod a no-op and leaving the remainder value.
+                        if remainder.end() < divisor {
+                            // Success! We found that divided_vid / divisor == equivalent_vid.
+                            self.equivalent_values.update_equivalent_values(
+                                &mut self.values,
+                                *remainder_origin,
+                                result_vid,
+                            );
+                        }
+                    }
+                }
+                _ => unreachable!(),
             }
         }
 
@@ -584,7 +804,7 @@ impl Analysis {
                     .get_mut(&state_after)
                     .unwrap()
                     .registers
-                    .iter_mut()
+                    .iter_mut(),
             ) {
                 if *is_unused {
                     *register_value = undefined_vid;
