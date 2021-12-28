@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, cmp::Ordering};
 
 use crate::parser::{Instruction, Operand, Register};
 
@@ -75,6 +75,7 @@ struct Analysis {
     pub values: BTreeMap<Vid, Value>,
     pub register_states: BTreeMap<Rsid, RegisterState>,
     pub inputs: Vec<Vid>, // the value IDs of all input instructions
+    pub equivalent_values: BTreeMap<Vid, Vid>,
 }
 
 impl From<Vec<Instruction>> for Analysis {
@@ -106,6 +107,7 @@ impl From<Vec<Instruction>> for Analysis {
             values,
             register_states,
             inputs,
+            equivalent_values: Default::default(),
         }
     }
 }
@@ -113,12 +115,65 @@ impl From<Vec<Instruction>> for Analysis {
 fn narrow_value_range(values: &mut BTreeMap<Vid, Value>, vid: Vid, range: &ValueRange) -> ValueRange {
     let owned_value = values.remove(&vid).unwrap();
     let final_result = owned_value.narrow_range(range);
-    let final_range = final_result.range().clone();
+    let final_range = final_result.range();
     values.try_insert(vid, final_result).unwrap();
     final_range
 }
 
 impl Analysis {
+    fn get_equivalent_value(&mut self, vid: Vid) -> Vid {
+        // Union-find on the equivalent values graph, always pointing toward lower-numbered Vids.
+        let mut current_vid = vid;
+        let mut ancestors = vec![];
+
+        let initial_range = &self.values[&vid].range();
+        let mut range = initial_range.clone();
+        while let Some(parent) = self.equivalent_values.get(&current_vid) {
+            assert!(*parent < current_vid);  // protect against cycles
+
+            let parent_range = &self.values[parent].range();
+            range = range.intersect(parent_range).unwrap();
+
+            ancestors.push(current_vid);
+            current_vid = *parent;
+        }
+
+        // Not all the values we came across agreed on
+        if initial_range != &range {
+            for ancestor in &ancestors {
+                narrow_value_range(&mut self.values, *ancestor, &range);
+            }
+        }
+
+        // We skip one element from the back since the last element had the correct parent.
+        // All other elements need to point to this final equivalent value.
+        for ancestor in ancestors.into_iter().rev().skip(1) {
+            self.equivalent_values.insert(ancestor, current_vid).unwrap();
+        }
+
+        current_vid
+    }
+
+    fn update_equivalent_values(&mut self, left: Vid, right: Vid) {
+        // Update the ranges of the values to match each other.
+        let left_range = &self.values[&left].range();
+        let right_range = &self.values[&right].range();
+        narrow_value_range(&mut self.values, left, right_range);
+        narrow_value_range(&mut self.values, right, left_range);
+
+        // Union-find on the equivalent values graph, always pointing toward lower-numbered Vids.
+        let left_equivalent = self.get_equivalent_value(left);
+        let right_equivalent = self.get_equivalent_value(right);
+
+        let (lower_vid, higher_vid) = match left_equivalent.cmp(&right_equivalent) {
+            Ordering::Less => (left_equivalent, right_equivalent),
+            Ordering::Greater => (right_equivalent, left_equivalent),
+            Ordering::Equal => unreachable!("{:?} {:?}", left_equivalent, right_equivalent),
+        };
+
+        self.equivalent_values.insert(higher_vid, lower_vid);
+    }
+
     pub fn constant_propagation(mut self) -> Self {
         for ann_instr in self.annotated.values() {
             let source_vid = ann_instr.source;
