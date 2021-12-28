@@ -128,6 +128,18 @@ impl Add for &ValueRange {
     }
 }
 
+impl Add<i64> for &ValueRange {
+    type Output = ValueRange;
+
+    #[inline]
+    fn add(self, rhs: i64) -> Self::Output {
+        Self::Output::new(
+            self.start().saturating_add(rhs),
+            self.end().saturating_add(rhs),
+        )
+    }
+}
+
 impl Sub for &ValueRange {
     type Output = ValueRange;
 
@@ -136,6 +148,18 @@ impl Sub for &ValueRange {
         Self::Output::new(
             self.start().saturating_sub(rhs.end()),
             self.end().saturating_sub(rhs.start()),
+        )
+    }
+}
+
+impl Sub<i64> for &ValueRange {
+    type Output = ValueRange;
+
+    #[inline]
+    fn sub(self, rhs: i64) -> Self::Output {
+        Self::Output::new(
+            self.start().saturating_sub(rhs),
+            self.end().saturating_sub(rhs),
         )
     }
 }
@@ -157,6 +181,10 @@ impl Mul<&ValueRange> for &ValueRange {
     type Output = ValueRange;
 
     fn mul(self, rhs: &ValueRange) -> Self::Output {
+        if rhs.is_exact() {
+            return self * rhs.start();
+        }
+
         let range_a = self * rhs.start();
         let range_b = self * rhs.end();
 
