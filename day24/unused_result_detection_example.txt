@@ -1,0 +1,6 @@
+add y 7
+[    N/A: Undefined     |      42: Exact(1)      |  55: Unknown(8..=16)   |    50: Unknown(max)   ]
+mul y x  *pruned: NoOpInputs
+[    N/A: Undefined     |     N/A: Undefined     |  55: Unknown(8..=16)   |    50: Unknown(max)   ]
+
+unused result detection should make x undefined prior to the pruned mul

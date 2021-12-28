@@ -630,12 +630,19 @@ impl Analysis {
         self
     }
 
-    /// An analysis pass made to work after unused_register_elimination().
-    /// It looks for instruction results that never get used, then:
-    /// - prunes the instruction
-    /// - propagates the source register's Undefined state upward
-    /// - if the operand was a register and was unused after that instruction, it propagates
-    ///   that register's Undefined state upward as well
+    /// An analysis pass made to work after unused_register_elimination() and prune results
+    /// that never get used.
+    ///
+    /// Two ways that can happen:
+    /// 1. An instruction produces a result that is never used. In that case, this pass:
+    ///   - prunes the instruction
+    ///   - propagates the source register's Undefined state upward
+    ///   - if the operand was a register and was unused after that instruction, it propagates
+    ///     that register's Undefined state upward as well
+    /// 2. An instruction that already got pruned by a prior pass has a register operand that
+    ///    becomes unused immediately after that instruction. Since the instruction got pruned,
+    ///    that register operand is unused in that instruction as well. In that case, this pass
+    ///    propagates that register's Undefined state upward.
     pub fn unused_result_elimination(mut self) -> Self {
         let mut overwrite_unused: [Option<Vid>; 4] = [None, None, None, None];
 
@@ -654,6 +661,18 @@ impl Analysis {
             }
 
             let registers_after = &state_after.registers;
+
+            // If this instruction has already been pruned by a prior pass,
+            // and it was the only reason an operand register was still live,
+            // then propagate the operand register's Undefined value.
+            if self.pruned.contains_key(&ann_instr.id) {
+                if let Some(Operand::Register(Register(r))) = ann_instr.instr.operand() {
+                    let operand_vid = registers_after[r];
+                    if matches!(self.values[&operand_vid], Value::Undefined) {
+                        overwrite_unused[r] = Some(operand_vid);
+                    }
+                }
+            }
 
             match ann_instr.instr {
                 Instruction::Input(_) => {}
@@ -684,12 +703,12 @@ impl Analysis {
                                 }
                             }
                         }
-                    } else {
-                        match operand {
-                            Operand::Literal(_) => {}
-                            Operand::Register(Register(r)) => {
-                                overwrite_unused[r] = None;
-                            }
+                    } else if !self.pruned.contains_key(&ann_instr.id) {
+                        // Unpruned instructions consume their source and operand values.
+                        // Pruned instructions do not consume them since pruned instructions
+                        // will be removed.
+                        if let Some(Operand::Register(Register(r))) = ann_instr.instr.operand() {
+                            overwrite_unused[r] = None;
                         }
                         overwrite_unused[n] = None;
                     }

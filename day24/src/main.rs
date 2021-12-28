@@ -73,7 +73,7 @@ fn optimize_program(input_program: &[Instruction]) -> Analysis {
 
         // At the moment, this pass doesn't seem to do anything, reconsider and maybe enable
         // if it does something after more analysis passes are implemented.
-        // .unused_result_elimination()
+        .unused_result_elimination()
 }
 
 #[allow(unused_variables)]
