@@ -150,6 +150,26 @@ impl Mul<i64> for &ValueRange {
     }
 }
 
+impl Mul<&ValueRange> for &ValueRange {
+    type Output = ValueRange;
+
+    fn mul(self, rhs: &ValueRange) -> Self::Output {
+        let range_a = self * rhs.start();
+        let range_b = self * rhs.end();
+
+        let endpoints = [
+            range_a.start(),
+            range_a.end(),
+            range_b.start(),
+            range_b.end(),
+        ];
+        Self::Output::new(
+            *endpoints.iter().min().unwrap(),
+            *endpoints.iter().max().unwrap(),
+        )
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Value {
     Exact(Vid, i64),

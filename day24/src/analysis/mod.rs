@@ -537,14 +537,7 @@ impl Analysis {
                 Instruction::Input(_) => unreachable!(),
                 Instruction::Add(_, _) => Some(source_range + operand_range),
                 Instruction::Mul(_, _) => {
-                    if operand_range.is_exact() {
-                        Some(source_range * operand_range.start())
-                    } else if source_range.is_exact() {
-                        Some(operand_range * source_range.start())
-                    } else {
-                        // TODO: implement me, be very careful with edge cases
-                        None
-                    }
+                    Some(source_range * operand_range)
                 }
                 Instruction::Div(_, _) => {
                     // The Advent of Code challenge input only contains divisions
