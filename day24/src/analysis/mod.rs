@@ -575,7 +575,7 @@ impl Analysis {
     /// Look for mul and div/mod no-op instruction groups like:
     /// 1) "mul x 13; add x 10; mul 2; div x 26", in which case:
     ///    - this is essentially "mul x 26; add x 20" followed by the div
-    ///    - the div truncates out the addition, and leaves us with the original value in the mul.
+    ///    - the div truncates out the addition, and leaves us with the original input to the mul.
     /// 2) "mul x 13; add x 10; mul 2; mod x 26", in which case:
     ///    - this is essentially "mul x 26; add x 20" followed by the mod
     ///    - the mod eliminates all but the added 20
