@@ -1,4 +1,4 @@
-use std::{ops::{Add, RangeInclusive, Sub}};
+use std::{ops::{Add, RangeInclusive, Sub}, fmt::Display};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Vid(pub usize);
@@ -87,6 +87,20 @@ impl ValueRange {
     }
 }
 
+impl Display for ValueRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self == &ValueRange::MAX {
+            write!(f, "max")
+        } else if self.start() == ValueRange::MAX.start() {
+            write!(f, "-inf..={}", self.end())
+        } else if self.end() == ValueRange::MAX.end() {
+            write!(f, "{}..=+inf", self.start())
+        } else {
+            write!(f, "{:?}", self.range)
+        }
+    }
+}
+
 impl From<RangeInclusive<i64>> for ValueRange {
     #[inline]
     fn from(range: RangeInclusive<i64>) -> Self {
@@ -162,6 +176,17 @@ impl Value {
                 }
             },
             Value::Undefined => unreachable!(),
+        }
+    }
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::Exact(vid, value) => write!(f, "{}: Exact({})", vid.0, *value),
+            Value::Input(vid, inp, range) => write!(f, "{}: Input_{}({})", vid.0, inp, range),
+            Value::Unknown(vid, range) => write!(f, "{}: Unknown({})", vid.0, range),
+            Value::Undefined => write!(f, "N/A: Undefined"),
         }
     }
 }

@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, cmp::Ordering};
+use std::{cmp::Ordering, collections::BTreeMap, fmt::Display};
 
 use crate::parser::{Instruction, Operand, Register};
 
@@ -40,7 +40,7 @@ impl Iterator for RsidMaker {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct RegisterState {
+pub struct RegisterState {
     registers: [Vid; 4],
 }
 
@@ -52,7 +52,7 @@ impl RegisterState {
 }
 
 #[derive(Debug, Clone)]
-struct AnnotatedInstr {
+pub struct AnnotatedInstr {
     pub id: InstrId,
     pub follows: Option<InstrId>,
     pub instr: Instruction,
@@ -69,13 +69,35 @@ struct AnnotatedInstr {
 }
 
 #[derive(Debug, Clone)]
-struct Analysis {
+pub struct Analysis {
     pub input_program: BTreeMap<InstrId, Instruction>,
     pub annotated: BTreeMap<InstrId, AnnotatedInstr>,
     pub values: BTreeMap<Vid, Value>,
     pub register_states: BTreeMap<Rsid, RegisterState>,
     pub inputs: Vec<Vid>, // the value IDs of all input instructions
     pub equivalent_values: BTreeMap<Vid, Vid>,
+}
+
+impl Display for Analysis {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (instr_id, instr) in &self.input_program {
+            writeln!(f, "{}", instr)?;
+
+            let annotated = &self.annotated[instr_id];
+            let registers_after = self.register_states[&annotated.state_after];
+
+            writeln!(
+                f,
+                "[{: ^22} | {: ^22} | {: ^22} | {: ^22}]",
+                format!("{}", self.values[&registers_after.registers[0]]),
+                format!("{}", self.values[&registers_after.registers[1]]),
+                format!("{}", self.values[&registers_after.registers[2]]),
+                format!("{}", self.values[&registers_after.registers[3]]),
+            )?;
+        }
+
+        Ok(())
+    }
 }
 
 impl From<Vec<Instruction>> for Analysis {
@@ -112,7 +134,11 @@ impl From<Vec<Instruction>> for Analysis {
     }
 }
 
-fn narrow_value_range(values: &mut BTreeMap<Vid, Value>, vid: Vid, range: &ValueRange) -> ValueRange {
+fn narrow_value_range(
+    values: &mut BTreeMap<Vid, Value>,
+    vid: Vid,
+    range: &ValueRange,
+) -> ValueRange {
     let owned_value = values.remove(&vid).unwrap();
     let final_result = owned_value.narrow_range(range);
     let final_range = final_result.range();
@@ -129,7 +155,7 @@ impl Analysis {
         let initial_range = &self.values[&vid].range();
         let mut range = initial_range.clone();
         while let Some(parent) = self.equivalent_values.get(&current_vid) {
-            assert!(*parent < current_vid);  // protect against cycles
+            assert!(*parent < current_vid); // protect against cycles
 
             let parent_range = &self.values[parent].range();
             range = range.intersect(parent_range).unwrap();
@@ -148,7 +174,9 @@ impl Analysis {
         // We skip one element from the back since the last element had the correct parent.
         // All other elements need to point to this final equivalent value.
         for ancestor in ancestors.into_iter().rev().skip(1) {
-            self.equivalent_values.insert(ancestor, current_vid).unwrap();
+            self.equivalent_values
+                .insert(ancestor, current_vid)
+                .unwrap();
         }
 
         current_vid
@@ -197,7 +225,11 @@ impl Analysis {
                         }
                     }
                 };
-                narrow_value_range(&mut self.values, result_vid, &ValueRange::new_exact(result_value));
+                narrow_value_range(
+                    &mut self.values,
+                    result_vid,
+                    &ValueRange::new_exact(result_value),
+                );
             }
         }
 
@@ -207,10 +239,10 @@ impl Analysis {
     pub fn operation_definedness(mut self) -> Self {
         for ann_instr in self.annotated.values() {
             match ann_instr.instr {
-                Instruction::Input(_) |
-                Instruction::Add(_, _) |
-                Instruction::Mul(_, _) |
-                Instruction::Div(_, _) => {
+                Instruction::Input(_)
+                | Instruction::Add(_, _)
+                | Instruction::Mul(_, _)
+                | Instruction::Div(_, _) => {
                     // For all these operations except Instruction::Div(),
                     // all input and output values are possible so there are
                     // no definedness invariants to be used.
@@ -224,13 +256,25 @@ impl Analysis {
                     // which can be run multiple times and will maximize the odds the invariant
                     // is actually useful.
                     continue;
-                },
+                }
                 Instruction::Mod(_, _) => {
                     // The source must be non-negative, and the operand must be strictly positive.
                     // The result must be between zero and the operand value minus one.
-                    narrow_value_range(&mut self.values, ann_instr.source, &ValueRange::new(0, i64::MAX));
-                    let operand_range = narrow_value_range(&mut self.values, ann_instr.operand, &ValueRange::new(1, i64::MAX));
-                    narrow_value_range(&mut self.values, ann_instr.result, &ValueRange::new(0, operand_range.end() - 1));
+                    narrow_value_range(
+                        &mut self.values,
+                        ann_instr.source,
+                        &ValueRange::new(0, i64::MAX),
+                    );
+                    let operand_range = narrow_value_range(
+                        &mut self.values,
+                        ann_instr.operand,
+                        &ValueRange::new(1, i64::MAX),
+                    );
+                    narrow_value_range(
+                        &mut self.values,
+                        ann_instr.result,
+                        &ValueRange::new(0, operand_range.end() - 1),
+                    );
                 }
                 Instruction::Equal(_, _) => {
                     // The result must be either 0 or 1.

@@ -4,6 +4,7 @@ use std::{
     env, fs,
 };
 
+use analysis::Analysis;
 #[allow(unused_imports)]
 use itertools::Itertools;
 
@@ -42,8 +43,20 @@ fn main() {
     }
 }
 
+fn optimize_program(input_program: &[Instruction]) -> Analysis {
+    let analysis: Analysis =  input_program.iter().cloned().collect_vec().into();
+
+    analysis
+        .constant_propagation()
+        .operation_definedness()
+}
+
 #[allow(unused_variables)]
 fn solve_part1(data: &[Instruction]) -> u64 {
+    let optimized_program = optimize_program(data);
+
+    println!("{}", optimized_program);
+
     0
 }
 
