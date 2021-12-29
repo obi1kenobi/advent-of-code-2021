@@ -111,7 +111,7 @@ fn finalize_optimization(analysis: Analysis) -> Analysis {
         // Instruction pruning isn't useful in the early passes, so save it until later.
         .prune_for_no_change_in_registers()
 
-        // Keep this pass near the bottom, since prior analysis passes are not compatible with it.
+        // Keep this pass near the end, since prior analysis passes are not compatible with it.
         .unused_register_elimination()
         .unused_result_elimination()
 
@@ -120,7 +120,7 @@ fn finalize_optimization(analysis: Analysis) -> Analysis {
         .prune_unnecessary_register_clears()
 }
 
-fn part1_specific_analysis(
+fn last_z_is_zero_analysis(
     mut current_analysis: Analysis,
 ) -> (Vec<ValueRange>, BTreeMap<Vid, ValueRange>) {
     // Update the analysis with the information that the last z register value is 0.
@@ -203,7 +203,7 @@ fn prepare_for_input_search(
 
     // Then, apply the information that the last Z value is 0 and figure out
     // the ranges of the input data necessary for the last Z value to be 0.
-    let (input_ranges, expected_values) = part1_specific_analysis(current_analysis.clone());
+    let (input_ranges, expected_values) = last_z_is_zero_analysis(current_analysis.clone());
 
     // Then, re-analyze the optimized program, and apply the input ranges from the prior step.
     for (index, range) in input_ranges.iter().enumerate() {
@@ -222,8 +222,6 @@ fn prepare_for_input_search(
 fn solve_part1(data: &[Instruction]) -> u64 {
     let (current_analysis, input_ranges, expected_values) = prepare_for_input_search(data);
 
-    // println!("{}", current_analysis);
-
     // Simulate the program, checking that the register state after each instruction
     // matches the register states expected in the analysis for Z=0, and abandoning simulation
     // directions that produce register states inconsistent with that analysis.
@@ -232,8 +230,6 @@ fn solve_part1(data: &[Instruction]) -> u64 {
 
 fn solve_part2(data: &[Instruction]) -> u64 {
     let (current_analysis, input_ranges, expected_values) = prepare_for_input_search(data);
-
-    // println!("{}", current_analysis);
 
     // Simulate the program, checking that the register state after each instruction
     // matches the register states expected in the analysis for Z=0, and abandoning simulation
