@@ -1,0 +1,40 @@
+inp w
+[  23: Input_2(4..=9)   |     N/A: Undefined     |     N/A: Undefined     | 22: Unknown(285..=328)]
+mul y 0
+[  23: Input_2(4..=9)   |     N/A: Undefined     |      24: Exact(0)      | 22: Unknown(285..=328)]
+add y 25
+[  23: Input_2(4..=9)   |     N/A: Undefined     |     26: Exact(25)      | 22: Unknown(285..=328)]
+add y 1
+[  23: Input_2(4..=9)   |     N/A: Undefined     |     29: Exact(26)      | 22: Unknown(285..=328)]
+mul z y
+[  23: Input_2(4..=9)   |     N/A: Undefined     |     N/A: Undefined     | 30: Unknown(7410..=8528)]
+mul y 0
+[  23: Input_2(4..=9)   |     N/A: Undefined     |      31: Exact(0)      | 30: Unknown(7410..=8528)]
+add y w
+[    N/A: Undefined     |     N/A: Undefined     |   23: Input_2(4..=9)   | 30: Unknown(7410..=8528)]
+add y 1
+[    N/A: Undefined     |     N/A: Undefined     |  35: Unknown(5..=10)   | 30: Unknown(7410..=8528)]
+add z y
+[    N/A: Undefined     |     N/A: Undefined     |     N/A: Undefined     | 36: Unknown(7415..=8538)]
+inp w
+[  37: Input_3(1..=6)   |     N/A: Undefined     |     N/A: Undefined     | 36: Unknown(7415..=8538)]
+mul x 0  *pruned: NoRegisterChange
+[  37: Input_3(1..=6)   |      1: Exact(0)       |     N/A: Undefined     | 36: Unknown(7415..=8538)]
+add x z
+[  37: Input_3(1..=6)   | 36: Unknown(7415..=8538) |     N/A: Undefined     | 36: Unknown(7415..=8538)]
+mod x 26
+[  37: Input_3(1..=6)   |  35: Unknown(5..=10)   |     N/A: Undefined     | 36: Unknown(7415..=8538)]
+div z 26
+[  37: Input_3(1..=6)   |  35: Unknown(5..=10)   |     N/A: Undefined     | 22: Unknown(285..=328)]
+add x -4
+[  37: Input_3(1..=6)   |   37: Input_3(1..=6)   |     N/A: Undefined     | 22: Unknown(285..=328)]
+eql x w
+[  37: Input_3(1..=6)   |      47: Exact(1)      |     N/A: Undefined     | 22: Unknown(285..=328)]
+
+
+Example where peephole optimization could help:
+- For 47 to be Exact(1), Input_3 must be 35: Unknown(5..=10) - 4.
+- But 35: Unknown(5..=10) is itself Input_2 + 1, though hidden behind a mul 26 / mod 26 combination.
+- Once the optimizer has noticed that the mul/mod cancel each other out, it could then omit the
+  Input_2 + 1 instruction and simply use Input_2, then compare Input_3 against Input_2 - 3
+  rather than against 35: Unknown(5..=10) - 4.
