@@ -1,0 +1,36 @@
+inp w
+[ 366: Input_13(1..=1)  |     350: Exact(0)      |     350: Exact(0)      |     345: Exact(12)    ]
+mul x 0
+[ 366: Input_13(1..=1)  |     350: Exact(0)      |     350: Exact(0)      |     345: Exact(12)    ]
+add x z
+[ 366: Input_13(1..=1)  |     345: Exact(12)     |     350: Exact(0)      |     345: Exact(12)    ]
+mod x 26  *pruned: NoOpInputs
+[ 366: Input_13(1..=1)  |     345: Exact(12)     |     350: Exact(0)      |     345: Exact(12)    ]
+div z 26
+[ 366: Input_13(1..=1)  |     345: Exact(12)     |     350: Exact(0)      |     373: Exact(0)     ]
+add x -11
+[ 366: Input_13(1..=1)  |  366: Input_13(1..=1)  |     350: Exact(0)      |     373: Exact(0)     ]
+eql x w
+[ 366: Input_13(1..=1)  |     376: Exact(1)      |     350: Exact(0)      |     373: Exact(0)     ]
+eql x 0
+[ 366: Input_13(1..=1)  |     373: Exact(0)      |     350: Exact(0)      |     373: Exact(0)     ]
+mul y 0
+[ 366: Input_13(1..=1)  |     373: Exact(0)      |     350: Exact(0)      |     373: Exact(0)     ]
+add y 25
+[ 366: Input_13(1..=1)  |     373: Exact(0)      |     381: Exact(25)     |     373: Exact(0)     ]
+mul y x
+[ 366: Input_13(1..=1)  |     373: Exact(0)      |     373: Exact(0)      |     373: Exact(0)     ]
+add y 1
+[ 366: Input_13(1..=1)  |     373: Exact(0)      |     384: Exact(1)      |     373: Exact(0)     ]
+mul z y
+[ 366: Input_13(1..=1)  |     373: Exact(0)      |     384: Exact(1)      |     373: Exact(0)     ]
+mul y 0
+[ 366: Input_13(1..=1)  |     373: Exact(0)      |     387: Exact(0)      |     373: Exact(0)     ]
+add y w
+[ 366: Input_13(1..=1)  |     373: Exact(0)      |  366: Input_13(1..=1)  |     373: Exact(0)     ]
+add y 1
+[ 366: Input_13(1..=1)  |     373: Exact(0)      |     391: Exact(2)      |     373: Exact(0)     ]
+mul y x
+[ 366: Input_13(1..=1)  |     373: Exact(0)      |     373: Exact(0)      |     373: Exact(0)     ]
+add z y
+[ 366: Input_13(1..=1)  |     373: Exact(0)      |     373: Exact(0)      |     373: Exact(0)     ]
