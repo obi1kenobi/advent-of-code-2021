@@ -13,6 +13,7 @@ use crate::parser::{Instruction, Operand, Register};
 use self::values::{Value, ValueRange, Vid, VidMaker};
 
 pub mod values;
+mod range_analysis;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct InstrId(pub usize);

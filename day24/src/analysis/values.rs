@@ -45,6 +45,7 @@ impl ValueRange {
 
     #[inline]
     pub const fn new(start: i64, end: i64) -> Self {
+        assert!(start <= end);
         Self { range: start..=end }
     }
 
