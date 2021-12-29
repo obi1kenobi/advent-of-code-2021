@@ -1,0 +1,14 @@
+after pruning, apply peephole rules:
+    initialize value directly
+        mul x 0
+        add x 25
+        add x 1
+    commutative addition, sum directly
+        mul x 0
+        add x 5
+        add x y
+        add z x
+    clear register + move but original went unused, should have just used original
+        mul x 0
+        add x w
+        < w is unused >
