@@ -1,0 +1,26 @@
+
+
+  instruction          register values after instruction
+   /          ________________________/\_________________________
+  \/         /                /              \                   \
+inp w       \/               \/              \/                  \/
+[ 226: Input_8(6..=9) | 210: Exact(0) | 210: Exact(0) | 205: Unknown(287..=328) ]
+   /\    /\      /\                           /\                   /\
+   /      \       \                           /                     \
+ value     \  value range                    /                       \
+ number     \                               /                         \
+       kind of value            this register's value     this register has some value
+   (Input, Exact, Unknown)        is definitely zero         in the range 287..=328
+
+
+
+inp w
+[ 226: Input_8(6..=9) |     210: Exact(0)     | 210: Exact(0) |205: Unknown(287..=328)]
+add x z
+[ 226: Input_8(6..=9) |205: Unknown(287..=328)| 210: Exact(0) |205: Unknown(287..=328)]
+mod x 26
+[ 226: Input_8(6..=9) | 231: Unknown(0..=25)  | 210: Exact(0) |205: Unknown(287..=328)]
+add x 10
+[ 226: Input_8(6..=9) | 235: Unknown(10..=35) | 210: Exact(0) |205: Unknown(287..=328)]
+eql x w
+[ 226: Input_8(6..=9) |     236: Exact(0)     | 210: Exact(0) |205: Unknown(287..=328)]
