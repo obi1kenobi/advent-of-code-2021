@@ -30,9 +30,13 @@ fn main() {
     let input_data: Vec<Instruction> = parse_program(content.as_str());
 
     match part {
-        "optimize" => {
-            let optimized_instrs = optimize_program(&input_data);
+        "final" => {
+            let optimized_instrs = get_optimized_instructions(&input_data);
             println!("{}", InstructionStream(&optimized_instrs));
+        }
+        "optimize" => {
+            let analysis = optimize_program(&input_data);
+            println!("{}", analysis);
         }
         "intermediate" => {
             let analysis = analyze_program(&input_data);
@@ -50,10 +54,14 @@ fn main() {
     }
 }
 
-fn optimize_program(input_program: &[Instruction]) -> Vec<Instruction> {
+fn get_optimized_instructions(input_program: &[Instruction]) -> Vec<Instruction> {
+    optimize_program(input_program).get_optimized_instructions()
+}
+
+fn optimize_program(input_program: &[Instruction]) -> Analysis {
     let analysis = analyze_program(input_program);
 
-    finalize_optimization(analysis).get_optimized_instructions()
+    finalize_optimization(analysis)
 }
 
 fn analyze_program(input_program: &[Instruction]) -> Analysis {

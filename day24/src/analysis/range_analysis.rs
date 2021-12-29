@@ -220,22 +220,6 @@ fn mul_input_range_same_sign_input_ranges(
         .map(|final_result| (final_source, final_operand, final_result))
 }
 
-/// Merge a slice of potential ranges.
-fn merge_ranges(ranges: &[Option<ValueRange>]) -> ValueRange {
-    let range_min = ranges
-        .iter()
-        .filter_map(|opt| opt.clone().map(|r| r.start()))
-        .min()
-        .unwrap();
-    let range_max = ranges
-        .iter()
-        .filter_map(|opt| opt.clone().map(|r| r.end()))
-        .max()
-        .unwrap();
-
-    ValueRange::new(range_min, range_max)
-}
-
 /// Split a range into its negative (if any), zero (if any), and positive (if any) components.
 fn split_range(range: &ValueRange) -> (Option<ValueRange>, Option<ValueRange>, Option<ValueRange>) {
     let (mut negative, mut zero, mut positive): (

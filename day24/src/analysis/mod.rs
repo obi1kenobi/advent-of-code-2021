@@ -10,10 +10,13 @@ use itertools::Itertools;
 
 use crate::parser::{Instruction, Operand, Register};
 
-use self::values::{Value, ValueRange, Vid, VidMaker};
+use self::{
+    range_analysis::mul_input_range_analysis,
+    values::{Value, ValueRange, Vid, VidMaker},
+};
 
-pub mod values;
 mod range_analysis;
+pub mod values;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct InstrId(pub usize);
@@ -612,31 +615,11 @@ impl Analysis {
                     }
                 }
                 Instruction::Mul(_, _) => {
-                    // The easiest case of backpropagating range information through mul is when
-                    // the result is exactly 0, and only one of the inputs' ranges contains 0.
-                    // In that case, that input must be zero, and the other input gets clobbered
-                    // without being read, and will be eliminated in unused_register_elimination().
-                    if result_range.is_exactly(0) {
-                        let source_contains_zero = source_range.contains(0);
-                        let operand_contains_zero = operand_range.contains(0);
-
-                        match (source_contains_zero, operand_contains_zero) {
-                            (true, true) => {
-                                // At least one of the inputs must be zero but we
-                                // can't tell which one it will be -- it could be either.
-                                // There's no further information to be found here.
-                            }
-                            (true, false) => {
-                                // The source must be zero, since the operand cannot be zero.
-                                self.values.narrow_value_range(source_vid, &ValueRange::new_exact(0));
-                            }
-                            (false, true) => {
-                                // The operand must be zero, since the source cannot be zero.
-                                self.values.narrow_value_range(operand_vid, &ValueRange::new_exact(0));
-                            }
-                            (false, false) => unreachable!(),
-                        }
-                    }
+                    let (final_source, final_operand, final_result) =
+                        mul_input_range_analysis(source_range, operand_range, result_range);
+                    self.values.narrow_value_range(source_vid, &final_source);
+                    self.values.narrow_value_range(operand_vid, &final_operand);
+                    self.values.narrow_value_range(result_vid, &final_result);
                 }
                 Instruction::Div(_, _) => {
                     // The Advent of Code challenge input only contains divisions
@@ -662,8 +645,12 @@ impl Analysis {
 
                             // Account for possible truncation on either side.
                             let final_range = ValueRange::new(
-                                multiplied_range.start().saturating_sub(max_non_truncated_value),
-                                multiplied_range.end().saturating_add(max_non_truncated_value),
+                                multiplied_range
+                                    .start()
+                                    .saturating_sub(max_non_truncated_value),
+                                multiplied_range
+                                    .end()
+                                    .saturating_add(max_non_truncated_value),
                             );
                             self.values.narrow_value_range(source_vid, &final_range);
                         }
@@ -1113,13 +1100,16 @@ impl Analysis {
     }
 
     pub fn get_optimized_instructions(self) -> Vec<Instruction> {
-        self.annotated.into_iter().filter_map(|(key, annotated)| {
-            if self.pruned.contains_key(&key) {
-                None
-            } else {
-                Some(annotated.instr)
-            }
-        }).collect()
+        self.annotated
+            .into_iter()
+            .filter_map(|(key, annotated)| {
+                if self.pruned.contains_key(&key) {
+                    None
+                } else {
+                    Some(annotated.instr)
+                }
+            })
+            .collect()
     }
 }
 
