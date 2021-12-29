@@ -1,19 +1,23 @@
 #![feature(map_try_insert)]
 
-use std::{env, fs};
+use std::{collections::BTreeMap, env, fs};
 
-use analysis::Analysis;
+use analysis::{
+    values::{Value, Vid},
+    Analysis,
+};
 #[allow(unused_imports)]
 use itertools::Itertools;
 
 use parser::{parse_program, Instruction};
 
-use crate::analysis::values::ValueRange;
 #[allow(unused_imports)]
 use crate::parser::InstructionStream;
+use crate::{analysis::values::ValueRange, simulation::find_extremal_input_that_matches_analysis};
 
 mod analysis;
 mod parser;
+mod simulation;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -101,18 +105,24 @@ fn analyze_program(input_program: &[Instruction]) -> Analysis {
 ///            that don't actually match the semantics of the original input program.
 ///
 /// TODO: Express these limitations in the type of Analysis.
+#[rustfmt::skip]
 fn finalize_optimization(analysis: Analysis) -> Analysis {
     analysis
         // Instruction pruning isn't useful in the early passes, so save it until later.
         .prune_for_no_change_in_registers()
+
         // Keep this pass near the bottom, since prior analysis passes are not compatible with it.
         .unused_register_elimination()
         .unused_result_elimination()
+
+        // This pass benefits from having as many instructions pruned before it runs as possible.
+        // Leave it at the very end.
+        .prune_unnecessary_register_clears()
 }
 
-fn find_part1_input_ranges(input_program: &[Instruction]) -> Vec<ValueRange> {
-    let mut current_analysis = analyze_program(input_program);
-
+fn part1_specific_analysis(
+    mut current_analysis: Analysis,
+) -> (Vec<ValueRange>, BTreeMap<Vid, ValueRange>) {
     // Update the analysis with the information that the last z register value is 0.
     let last_z_register_id = current_analysis
         .register_states
@@ -157,42 +167,81 @@ fn find_part1_input_ranges(input_program: &[Instruction]) -> Vec<ValueRange> {
     // - Per the above, choosing Input_4 = Input_7 = 5 is undefined behavior, EVEN THOUGH both
     //   chosen values are within their respective ranges.
     //
-    // Instead of trusting the pruning decisions of this analysis, we only output
+    // Instead of trusting the pruning decisions of this analysis, we output
     // the detected input ranges and then re-run the analysis in only the forward direction.
     // In that case, merely respecting the input values' ranges is sufficient to avoid UB,
     // and those pruning decisions can be trusted.
-    current_analysis
+    let input_ranges = current_analysis
         .inputs
         .into_iter()
         .map(|vid| current_analysis.values[&vid].range())
-        .collect()
+        .collect();
+
+    let value_ranges = current_analysis
+        .values
+        .into_inner()
+        .into_iter()
+        .filter_map(|(vid, value)| {
+            if matches!(value, Value::Undefined) {
+                None
+            } else {
+                Some((vid, value.range()))
+            }
+        })
+        .collect();
+    (input_ranges, value_ranges)
 }
 
-#[allow(unused_variables)]
-fn solve_part1(data: &[Instruction]) -> u64 {
+fn prepare_for_input_search(
+    data: &[Instruction],
+) -> (Analysis, Vec<ValueRange>, BTreeMap<Vid, ValueRange>) {
     // First, optimize the program as much as possible
     // without considering the desired value for the last register.
     let optimized_program = get_optimized_instructions(data);
 
+    let mut current_analysis = initialize_analysis(&optimized_program);
+
     // Then, apply the information that the last Z value is 0 and figure out
     // the ranges of the input data necessary for the last Z value to be 0.
-    let input_ranges = find_part1_input_ranges(&optimized_program);
+    let (input_ranges, expected_values) = part1_specific_analysis(current_analysis.clone());
 
     // Then, re-analyze the optimized program, and apply the input ranges from the prior step.
-    let mut current_analysis = initialize_analysis(&optimized_program);
-    for (index, range) in input_ranges.into_iter().enumerate() {
-        current_analysis.values.narrow_value_range(current_analysis.inputs[index], &range);
+    for (index, range) in input_ranges.iter().enumerate() {
+        current_analysis
+            .values
+            .narrow_value_range(current_analysis.inputs[index], range);
     }
 
     // Now finish optimizing the program with the input range bounds applied.
     current_analysis = fixpoint_iteration(current_analysis);
+    current_analysis = finalize_optimization(current_analysis);
 
-    println!("{}", finalize_optimization(current_analysis));
-
-    0
+    (current_analysis, input_ranges, expected_values)
 }
 
-#[allow(unused_variables)]
-fn solve_part2(data: &[Instruction]) -> usize {
-    todo!()
+fn solve_part1(data: &[Instruction]) -> u64 {
+    let (current_analysis, input_ranges, expected_values) = prepare_for_input_search(data);
+
+    // println!("{}", current_analysis);
+
+    // Simulate the program, checking that the register state after each instruction
+    // matches the register states expected in the analysis for Z=0, and abandoning simulation
+    // directions that produce register states inconsistent with that analysis.
+    find_extremal_input_that_matches_analysis(current_analysis, input_ranges, expected_values, true)
+}
+
+fn solve_part2(data: &[Instruction]) -> u64 {
+    let (current_analysis, input_ranges, expected_values) = prepare_for_input_search(data);
+
+    // println!("{}", current_analysis);
+
+    // Simulate the program, checking that the register state after each instruction
+    // matches the register states expected in the analysis for Z=0, and abandoning simulation
+    // directions that produce register states inconsistent with that analysis.
+    find_extremal_input_that_matches_analysis(
+        current_analysis,
+        input_ranges,
+        expected_values,
+        false,
+    )
 }

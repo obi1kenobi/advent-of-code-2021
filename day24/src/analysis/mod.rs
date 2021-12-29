@@ -85,6 +85,7 @@ pub enum PrunedReason {
     NoOpInputs,
     NoRegisterChange,
     ResultNeverUsed,
+    UnnecessaryClearOnFirstUse,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -103,6 +104,11 @@ impl ValueRangeAnalysis {
         value: Value,
     ) -> Result<&mut Value, OccupiedError<Vid, Value>> {
         self.0.try_insert(vid, value)
+    }
+
+    #[inline]
+    pub fn into_inner(self) -> BTreeMap<Vid, Value> {
+        self.0
     }
 
     #[allow(dead_code)]
@@ -1093,6 +1099,44 @@ impl Analysis {
                         overwrite_unused[n] = None;
                     }
                 }
+            }
+        }
+
+        self
+    }
+
+    /// After pruning instructions, it's possible that we've ended up with the program's first use
+    /// of a register being a clearing instruction like "mul x 0". These may have been necessary
+    /// prior to pruning (to clear the state left over from now-pruned instructions), but are
+    /// no longer necessary since at the time of first use, each register's value is zero.
+    pub fn prune_unnecessary_register_clears(mut self) -> Analysis {
+        let mut seen_registers = [false; 4];
+        for ann_instr in self.annotated.values() {
+            let register = ann_instr.instr.destination().0;
+            if self.pruned.contains_key(&ann_instr.id) || seen_registers[register] {
+                continue;
+            }
+
+            match ann_instr.instr {
+                Instruction::Mul(_, _) => {
+                    let operand_vid = ann_instr.operand;
+                    let operand_range = self.values[&operand_vid].range();
+                    if operand_range.is_exactly(0) {
+                        self.pruned.try_insert(ann_instr.id, PrunedReason::UnnecessaryClearOnFirstUse).unwrap();
+                    }
+                }
+                Instruction::Input(_) |
+                Instruction::Add(_, _) |
+                Instruction::Div(_, _) |
+                Instruction::Mod(_, _) |
+                Instruction::Equal(_, _) => {}
+            }
+
+            seen_registers[register] = true;
+            if seen_registers.iter().all(|x| *x) {
+                // We've seen the first use of all registers, we can stop looking
+                // for unnecessary initializations to 0.
+                break;
             }
         }
 
